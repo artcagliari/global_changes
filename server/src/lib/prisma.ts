@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 
 // Singleton pattern para serverless functions (Vercel)
 declare global {
@@ -14,8 +14,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Configuração otimizada para serverless
-const prismaOptions = {
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+const prismaOptions: Prisma.PrismaClientOptions = {
+  log: process.env.NODE_ENV === 'development' 
+    ? (['query', 'error', 'warn'] as Prisma.LogLevel[])
+    : (['error'] as Prisma.LogLevel[]),
 }
 
 export const prisma =

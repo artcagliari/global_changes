@@ -33,7 +33,7 @@ async function getApp() {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
-    console.log(`📨 ${req.method} ${req.url || req.path}`)
+    console.log(`📨 ${req.method} ${req.url || ''}`)
     
     // Converter Vercel request/response para Express
     return expressApp(req as any, res as any)
