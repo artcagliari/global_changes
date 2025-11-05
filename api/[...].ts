@@ -13,7 +13,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         const serverModule = await import('../server/dist/index.js')
         app = serverModule.default
       } catch {
-        const serverModule = await import('../server/src/index')
+        const serverModule = await import('../server/src/index.js')
         app = serverModule.default
       }
     } catch (error: any) {

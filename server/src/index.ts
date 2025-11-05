@@ -3,9 +3,9 @@ import cors from 'cors'
 import morgan from 'morgan'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import videoRoutes from './routes/videos'
-import apiRoutes from './routes/api'
-import { prisma } from './lib/prisma'
+import videoRoutes from './routes/videos.js'
+import apiRoutes from './routes/api.js'
+import { prisma } from './lib/prisma.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

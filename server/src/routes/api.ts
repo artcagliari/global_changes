@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { prisma } from '../lib/prisma'
+import { prisma } from '../lib/prisma.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
