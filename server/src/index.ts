@@ -52,8 +52,8 @@ app.get('/health', (_req, res) => res.json({
   environment: process.env.NODE_ENV || 'development'
 }))
 
-// Rota para servir o frontend em produção
-if (process.env.NODE_ENV === 'production') {
+// Rota para servir o frontend em produção (apenas localmente, não no Vercel)
+if (process.env.NODE_ENV === 'production' && process.env.VERCEL !== '1') {
   app.use(express.static(path.join(__dirname, '../../dist')))
   
   app.get('*', (_req, res) => {
@@ -76,9 +76,14 @@ process.on('SIGINT', async () => {
   process.exit(0)
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
-  console.log(`📁 Ambiente: ${process.env.NODE_ENV || 'development'}`)
-})
+// Iniciar servidor apenas se não estiver em ambiente serverless (Vercel)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
+    console.log(`📁 Ambiente: ${process.env.NODE_ENV || 'development'}`)
+  })
+}
 
+// Exportar app para Vercel serverless functions
+export default app
 export { prisma }

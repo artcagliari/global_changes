@@ -1,33 +1,25 @@
 {
-  "version": 2,
-  "buildCommand": "npm run build && cd server && npm run prisma:generate && npm run build",
+  "buildCommand": "npm run build && cd server && npm run prisma:generate",
   "outputDirectory": "dist",
   "installCommand": "npm install && cd server && npm install",
-  "builds": [
-    {
-      "src": "server/src/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["server/**"]
-      }
+  "functions": {
+    "server/src/index.ts": {
+      "memory": 1024,
+      "maxDuration": 30
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/server/src/index.ts"
+      "source": "/api/(.*)",
+      "destination": "/server/src/index.ts"
     },
     {
-      "src": "/uploads/(.*)",
-      "dest": "/server/src/index.ts"
+      "source": "/uploads/(.*)",
+      "destination": "/server/src/index.ts"
     },
     {
-      "src": "/health",
-      "dest": "/server/src/index.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/dist/$1"
+      "source": "/health",
+      "destination": "/server/src/index.ts"
     }
   ],
   "env": {
