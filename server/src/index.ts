@@ -19,7 +19,25 @@ app.use(cors({
     : true, // Permite qualquer origem em desenvolvimento (localhost em qualquer porta)
   credentials: true
 }))
-app.use(express.json({ limit: '50mb' }))
+
+// Middleware de debug para verificar rotas no Vercel
+if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
+  app.use((req, res, next) => {
+    console.log(`🔍 Express: ${req.method} ${req.path} (originalUrl: ${req.originalUrl}, url: ${req.url})`)
+    next()
+  })
+}
+
+// Parse JSON apenas para rotas que não são uploads
+// Multer precisa processar multipart/form-data antes do body ser parseado
+app.use((req, res, next) => {
+  // Não parsear JSON se for upload de vídeo (multer vai processar)
+  if (req.path.includes('/videos/upload') && req.method === 'POST') {
+    return next()
+  }
+  express.json({ limit: '50mb' })(req, res, next)
+})
+
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 if (process.env.NODE_ENV !== 'production') {
