@@ -1,6 +1,9 @@
 // Vercel Serverless Function - Catch-all route para Express
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
+// Log quando o módulo é carregado
+console.log('📦 Módulo api/[...].ts carregado')
+
 // Cache do app Express
 let app: any = null
 
