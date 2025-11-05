@@ -33,15 +33,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, o path vem completo em req.url
-    // Exemplo: requisição para /api/users/123 resulta em req.url = '/users/123' ou '/api/users/123'
-    // Dependendo da configuração do vercel.json
+    // No Vercel com api/[...].ts, o req.url pode vir de diferentes formas:
+    // 1. Se o rewrite no vercel.json mantém /api: req.url = '/api/users/123'
+    // 2. Se o rewrite remove /api: req.url = '/users/123'
+    // 3. Os segmentos podem vir em req.query quando usa [...]
     
-    let path = req.url || ''
+    let url = req.url || ''
     
-    // Se a URL estiver vazia ou for apenas '/', tentar construir a partir do query
-    // Quando usa [...], os segmentos podem vir em req.query como '0', '1', etc.
-    if (!path || path === '/') {
+    console.log('🔍 DEBUG Vercel Request:')
+    console.log(`   req.url: ${req.url}`)
+    console.log(`   req.method: ${req.method}`)
+    console.log(`   req.query:`, JSON.stringify(req.query))
+    
+    // Se não tiver URL ou for apenas '/', construir a partir do query
+    // Quando usa [...], os segmentos vêm em req.query como '0', '1', etc.
+    if (!url || url === '/') {
       if (req.query && Object.keys(req.query).length > 0) {
         const segments: string[] = []
         let i = 0
@@ -50,95 +56,111 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           i++
         }
         if (segments.length > 0) {
-          path = '/' + segments.join('/')
+          url = '/' + segments.join('/')
+          console.log(`   URL construída do query: ${url}`)
         }
       }
     }
     
-    // Garantir que o path comece com /api
-    // Se o rewrite no vercel.json já adicionou /api, não adicionar novamente
-    if (!path.startsWith('/api')) {
-      path = '/api' + (path.startsWith('/') ? path : '/' + path)
+    // IMPORTANTE: No Vercel com api/[...].ts, o path pode não incluir /api
+    // Precisamos adicionar /api se não tiver
+    if (!url.startsWith('/api')) {
+      url = '/api' + (url.startsWith('/') ? url : '/' + url)
     }
     
-    // Separar query string do path
-    const [pathOnly, queryString] = path.split('?')
+    // Separar path e query string
+    const [pathOnly, queryString] = url.split('?')
     const fullUrl = pathOnly + (queryString ? '?' + queryString : '')
     
     console.log(`📨 ${req.method} ${pathOnly}`)
-    console.log(`   req.url original: ${req.url}`)
-    console.log(`   path final: ${pathOnly}`)
+    console.log(`   URL final: ${fullUrl}`)
     
-    // Criar um objeto request compatível com Express
-    // Modificar o req diretamente (não criar novo objeto)
-    const expressReq = req as any
-    
-    // Ajustar propriedades essenciais que o Express precisa
-    expressReq.url = fullUrl
-    expressReq.originalUrl = fullUrl
-    expressReq.path = pathOnly
-    expressReq.baseUrl = ''
-    
-    // Garantir que propriedades essenciais existam
-    if (!expressReq.method) {
-      expressReq.method = req.method || 'GET'
-    }
-    if (!expressReq.query) {
-      expressReq.query = {}
-    }
-    if (!expressReq.params) {
-      expressReq.params = {}
-    }
-    
-    // Adicionar métodos do Express Request se não existirem
-    if (typeof expressReq.get !== 'function') {
-      expressReq.get = function(name: string) {
+    // Criar um objeto request que o Express possa processar
+    // O Express precisa que o request tenha propriedades específicas
+    const expressReq = {
+      ...req,
+      url: fullUrl,
+      originalUrl: fullUrl,
+      path: pathOnly,
+      baseUrl: '',
+      method: req.method || 'GET',
+      query: req.query || {},
+      params: {},
+      body: req.body,
+      headers: req.headers || {},
+      // Métodos do Express Request
+      get: function(name: string) {
         const headers = this.headers || {}
         return headers[name.toLowerCase()]
-      }
-    }
-    
-    if (typeof expressReq.header !== 'function') {
-      expressReq.header = function(name: string) {
+      },
+      header: function(name: string) {
         return this.get(name)
-      }
-    }
+      },
+      // Propriedades adicionais necessárias
+      protocol: 'https',
+      secure: true,
+      hostname: req.headers?.['host']?.split(':')[0] || 'localhost',
+      ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
+      // Propriedades do Express
+      route: undefined,
+      res: res,
+      // Propriedades do Node.js IncomingMessage (para compatibilidade)
+      httpVersion: '1.1',
+      httpVersionMajor: 1,
+      httpVersionMinor: 1,
+      complete: false,
+      rawHeaders: [],
+      rawTrailers: [],
+      trailers: {},
+      upgrade: false,
+      aborted: false,
+      read: function() {},
+      setEncoding: function() {},
+      pause: function() {},
+      resume: function() {},
+      destroy: function() {},
+    } as any
     
-    // Processar a requisição no Express
+    // Processar a requisição no Express usando Promise
     return new Promise<void>((resolve) => {
       let finished = false
+      let responseSent = false
       
-      const finish = () => {
-        if (!finished) {
-          finished = true
-          resolve()
+      const checkFinished = () => {
+        if (res.headersSent || responseSent) {
+          if (!finished) {
+            finished = true
+            resolve()
+          }
         }
       }
       
-      // Interceptar métodos de resposta para detectar quando terminar
+      // Interceptar métodos de resposta
       const originalEnd = res.end.bind(res)
       res.end = function(...args: any[]) {
+        responseSent = true
         const result = originalEnd(...args)
-        finish()
+        setTimeout(checkFinished, 10)
         return result
       }
       
       const originalJson = res.json.bind(res)
       res.json = function(body?: any) {
+        responseSent = true
         const result = originalJson(body)
-        finish()
+        setTimeout(checkFinished, 10)
         return result
       }
       
       const originalSend = res.send.bind(res)
       res.send = function(body?: any) {
+        responseSent = true
         const result = originalSend(body)
-        finish()
+        setTimeout(checkFinished, 10)
         return result
       }
       
       // Processar com Express
-      // O callback é chamado quando o Express termina de processar (ou quando não encontra rota)
       expressApp(expressReq, res, (err?: any) => {
         if (err) {
           console.error('❌ Erro no Express:', err)
@@ -148,14 +170,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 error: 'Erro interno do servidor',
                 message: err.message
               })
+              responseSent = true
             } catch (sendError) {
               console.error('Erro ao enviar resposta de erro:', sendError)
             }
           }
-          finish()
+          checkFinished()
         } else {
           // Se não houve erro mas a resposta não foi enviada, o Express não encontrou a rota
-          if (!res.headersSent) {
+          if (!res.headersSent && !responseSent) {
             console.error('❌ Rota não encontrada pelo Express!')
             console.error(`   Método: ${req.method}`)
             console.error(`   Path: ${pathOnly}`)
@@ -167,21 +190,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               error: 'Rota não encontrada',
               path: pathOnly,
               method: req.method,
-              originalUrl: req.url
+              originalUrl: req.url,
+              debug: {
+                reqUrl: req.url,
+                query: req.query,
+                finalPath: pathOnly
+              }
             })
+            responseSent = true
           }
-          finish()
+          checkFinished()
         }
       })
       
-      // Timeout de segurança (30 segundos)
+      // Timeout de segurança
       setTimeout(() => {
         if (!finished) {
           console.warn('⚠️  Timeout após 30s')
-          if (!res.headersSent) {
+          if (!res.headersSent && !responseSent) {
             res.status(504).json({ error: 'Timeout' })
+            responseSent = true
           }
-          finish()
+          finished = true
+          resolve()
         }
       }, 30000)
     })
