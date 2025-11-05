@@ -31,9 +31,16 @@ const Dashboard = () => {
       if (response.ok) {
         const updatedUser = await response.json()
         useAuthStore.setState({ currentUser: updatedUser })
+      } else if (response.status === 404) {
+        // Se o usuário não for encontrado, não é um erro crítico
+        // O usuário já está logado, apenas não atualizamos os pontos
+        console.warn('⚠️  Usuário não encontrado para sincronização de pontos')
+      } else {
+        console.error('❌ Erro ao sincronizar pontos:', response.status, response.statusText)
       }
     } catch (error) {
-      console.error('Erro ao sincronizar pontos:', error)
+      // Não é crítico se falhar, o usuário já está logado
+      console.warn('⚠️  Erro ao sincronizar pontos (não crítico):', error)
     }
   }
 
