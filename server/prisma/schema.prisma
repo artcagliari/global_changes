@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  role        String   @default("student")
+  points      Int      @default(0)
+  createdAt   DateTime @default(now())
+  submissions Submission[]
+  redeemedRewards RewardRedemption[]
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  videoUrl    String
+  status      String   @default("pending")
+  submittedAt DateTime @default(now())
+}
+
+model Reward {
+  id        String @id @default(cuid())
+  name      String
+  pointCost Int
+  redemptions RewardRedemption[]
+}
+
+model RewardRedemption {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardId  String
+  reward    Reward   @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  pointsSpent Int
+  redeemedAt DateTime @default(now())
+}

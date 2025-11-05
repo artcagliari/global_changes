@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build && cd server && npm run prisma:generate && npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install && cd server && npm install",
+  "builds": [
+    {
+      "src": "server/src/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server/**"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/server/src/index.ts"
+    },
+    {
+      "src": "/uploads/(.*)",
+      "dest": "/server/src/index.ts"
+    },
+    {
+      "src": "/health",
+      "dest": "/server/src/index.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
