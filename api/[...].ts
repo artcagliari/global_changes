@@ -32,75 +32,79 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, o path vem em req.query como um objeto
-    // Exemplo: /api/users/123 -> req.query = { '0': 'users', '1': '123' }
-    // Ou pode vir em req.url diretamente
+    // No Vercel com api/[...].ts, req.url já vem com o path completo
+    // Exemplo: /api/users/123 -> req.url = '/api/users/123'
+    // Ou pode vir como /users/123 quando o rewrite remove /api
     let url = req.url || ''
     
-    // Se não tiver URL, construir a partir do query
-    // No Vercel, quando usa [...], os segmentos vêm como req.query['0'], req.query['1'], etc.
-    if (!url && req.query) {
-      const queryKeys = Object.keys(req.query).sort()
-      const pathSegments: string[] = []
-      
-      // Coletar todos os segmentos numéricos
-      for (let i = 0; i < queryKeys.length; i++) {
-        const key = String(i)
-        if (req.query[key]) {
-          pathSegments.push(String(req.query[key]))
+    // Se não tiver URL, tentar construir a partir do query
+    // Quando usa [...], os segmentos podem vir em req.query
+    if (!url || url === '/') {
+      if (req.query && Object.keys(req.query).length > 0) {
+        // Os segmentos vêm como '0', '1', '2', etc.
+        const segments: string[] = []
+        let i = 0
+        while (req.query[String(i)]) {
+          segments.push(String(req.query[String(i)]))
+          i++
+        }
+        if (segments.length > 0) {
+          url = '/' + segments.join('/')
         }
       }
-      
-      if (pathSegments.length > 0) {
-        url = '/' + pathSegments.join('/')
-      }
-    }
-    
-    // Garantir que comece com /
-    if (!url.startsWith('/')) {
-      url = '/' + url
     }
     
     // Garantir que comece com /api
-    const path = url.split('?')[0]
-    const finalPath = path.startsWith('/api') ? path : `/api${path}`
-    const queryString = url.includes('?') ? '?' + url.split('?')[1] : ''
-    const finalUrl = finalPath + queryString
+    if (!url.startsWith('/api')) {
+      url = '/api' + (url.startsWith('/') ? url : '/' + url)
+    }
     
-    console.log(`📨 ${req.method} ${finalPath}`)
-    console.log(`   URL original do Vercel: ${req.url}`)
-    console.log(`   URL construída: ${url}`)
-    console.log(`   URL final para Express: ${finalUrl}`)
-    console.log(`   Query params:`, req.query)
+    // Separar path e query string
+    const [path, queryString] = url.split('?')
+    const finalUrl = path + (queryString ? '?' + queryString : '')
     
-    // Criar objeto request compatível com Express
-    // Usar o req do Vercel mas adicionar propriedades necessárias
-    const expressReq = Object.create(req) as any
+    console.log(`📨 ${req.method} ${path}`)
+    console.log(`   URL original: ${req.url}`)
+    console.log(`   URL final: ${finalUrl}`)
     
-    // Sobrescrever propriedades essenciais
-    Object.assign(expressReq, {
-      url: finalUrl,
-      originalUrl: finalUrl,
-      path: finalPath,
-      baseUrl: '',
-      method: req.method || 'GET',
-      query: req.query || {},
-      params: {},
-      body: req.body,
-      headers: req.headers || {},
-      // Métodos do Express
-      get: function(name: string) {
-        return this.headers?.[name.toLowerCase()]
-      },
-      header: function(name: string) {
+    // Usar o req do Vercel diretamente, apenas ajustando propriedades essenciais
+    // O Express precisa que url, originalUrl, path estejam corretos
+    const expressReq = req as any
+    
+    // Ajustar propriedades que o Express precisa
+    expressReq.url = finalUrl
+    expressReq.originalUrl = finalUrl
+    expressReq.path = finalPath
+    expressReq.baseUrl = ''
+    
+    // Garantir que method esteja presente
+    if (!expressReq.method) {
+      expressReq.method = req.method || 'GET'
+    }
+    
+    // Garantir que query esteja presente
+    if (!expressReq.query) {
+      expressReq.query = {}
+    }
+    
+    // Garantir que params esteja presente (será preenchido pelo Express router)
+    if (!expressReq.params) {
+      expressReq.params = {}
+    }
+    
+    // Métodos do Express Request
+    if (!expressReq.get) {
+      expressReq.get = function(name: string) {
+        const headers = this.headers || {}
+        return headers[name.toLowerCase()]
+      }
+    }
+    
+    if (!expressReq.header) {
+      expressReq.header = function(name: string) {
         return this.get(name)
-      },
-      // Propriedades adicionais
-      protocol: 'https',
-      secure: true,
-      hostname: req.headers?.['host'] || 'localhost',
-      ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
-    })
+      }
+    }
     
     // Processar no Express usando callback
     return new Promise<void>((resolve) => {
@@ -153,24 +157,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
           // Se não houve erro mas a resposta não foi enviada, o Express não encontrou a rota
           if (!res.headersSent) {
-            console.error('❌ Rota não encontrada pelo Express!')
+            console.error('❌ Rota não encontrada!')
             console.error(`   Método: ${req.method}`)
-            console.error(`   Path: ${finalPath}`)
+            console.error(`   Path: ${path}`)
             console.error(`   URL: ${finalUrl}`)
-            console.error(`   Original URL: ${req.url}`)
+            console.error(`   req.url original: ${req.url}`)
+            console.error(`   req.query:`, req.query)
             
-            setTimeout(() => {
-              if (!res.headersSent) {
-                res.status(404).json({
-                  error: 'Rota não encontrada',
-                  path: finalPath,
-                  method: req.method,
-                  originalUrl: req.url,
-                  hint: 'Verifique se a rota está registrada no Express'
-                })
-              }
-              finish()
-            }, 200)
+            res.status(404).json({
+              error: 'Rota não encontrada',
+              path: path,
+              method: req.method,
+              originalUrl: req.url
+            })
           } else {
             finish()
           }
