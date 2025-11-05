@@ -14,6 +14,7 @@ import { PrismaClient } from '@prisma/client'
 import Database from 'better-sqlite3'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -24,7 +25,7 @@ async function migrateData() {
   // Conectar ao SQLite (local)
   const sqlitePath = path.join(__dirname, 'dev.db')
   
-  if (!require('fs').existsSync(sqlitePath)) {
+  if (!existsSync(sqlitePath)) {
     console.error('❌ Arquivo dev.db não encontrado!')
     console.error(`   Procurando em: ${sqlitePath}`)
     process.exit(1)
