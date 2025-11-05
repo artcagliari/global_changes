@@ -1,5 +1,6 @@
 // Vercel Serverless Function - Catch-all route para Express
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { IncomingMessage } from 'http'
 
 // Log quando o módulo é carregado
 console.log('📦 Módulo api/[...].ts carregado')
@@ -19,24 +20,19 @@ async function getApp() {
       }
       
       // Importar o app Express
-      // Tentar diferentes caminhos dependendo do ambiente
       let serverModule: any = null
-      let importError: any = null
       
-      // Tentar primeiro o caminho direto (TypeScript/compilado)
       try {
         serverModule = await import('../server/src/index.js')
         console.log('✅ Importado de ../server/src/index.js')
       } catch (error: any) {
-        importError = error
-        console.log('⚠️  Não conseguiu importar de ../server/src/index.js')
-        // Tentar caminho compilado
+        console.log('⚠️  Tentando ../server/dist/index.js')
         try {
           serverModule = await import('../server/dist/index.js')
           console.log('✅ Importado de ../server/dist/index.js')
         } catch (error2: any) {
           console.error('❌ Não conseguiu importar de nenhum caminho')
-          throw importError
+          throw error
         }
       }
       
@@ -65,22 +61,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   
   try {
     const expressApp = await getApp()
-    console.log('✅ Express app obtido com sucesso')
+    console.log('✅ Express app obtido')
     
-    // No Vercel com api/[...].ts, o path pode vir de diferentes formas:
-    // - req.url pode ser '/api/videos/upload' (se o rewrite mantém /api)
-    // - req.url pode ser '/videos/upload' (se o rewrite remove /api)
-    // - req.query pode ter os segmentos quando usa [...]
-    
+    // Extrair path do URL
     let path = req.url || ''
     
     console.log('🔍 DEBUG Vercel Request:')
     console.log(`   req.url original: ${req.url}`)
     console.log(`   req.method: ${req.method}`)
-    console.log(`   req.query:`, JSON.stringify(req.query))
-    console.log(`   Content-Type: ${req.headers['content-type']}`)
     
-    // Se não tiver URL ou for apenas '/', construir a partir do query
+    // Se não tiver URL, construir a partir do query (quando usa [...])
     if (!path || path === '/') {
       if (req.query && Object.keys(req.query).length > 0) {
         const segments: string[] = []
@@ -96,11 +86,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
-    // Se o path não começar com /api, adicionar
-    // Mas verificar primeiro se já tem /api para não duplicar
+    // Garantir que comece com /api
     if (!path.startsWith('/api')) {
       path = '/api' + (path.startsWith('/') ? path : '/' + path)
-      console.log(`   Path ajustado para incluir /api: ${path}`)
     }
     
     // Separar path e query string
@@ -110,57 +98,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`📨 ${req.method} ${pathOnly}`)
     console.log(`   URL completa: ${fullUrl}`)
     
-    // Usar req do Vercel diretamente, ajustando apenas as propriedades essenciais
-    const expressReq = req as any
+    // Criar um objeto request que seja mais compatível com Express
+    // Usar req do Vercel como base mas garantir todas as propriedades necessárias
+    const expressReq = Object.create(req) as any
     
-    // IMPORTANTE: O Express router faz match usando req.url e req.originalUrl
-    // Para rotas com parâmetros (:id), precisamos garantir que o path esteja correto
-    // O Express calcula req.path internamente, mas podemos ajudar definindo explicitamente
-    expressReq.url = fullUrl
-    expressReq.originalUrl = fullUrl
-    // Definir path explicitamente para garantir match correto
-    expressReq.path = pathOnly
-    expressReq.baseUrl = ''
+    // Definir propriedades essenciais
+    Object.defineProperty(expressReq, 'url', {
+      value: fullUrl,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    })
     
-    console.log('🔧 Express Request configurado:')
-    console.log(`   url: ${expressReq.url}`)
-    console.log(`   originalUrl: ${expressReq.originalUrl}`)
-    console.log(`   path: ${expressReq.path}`)
-    console.log(`   method: ${expressReq.method}`)
+    Object.defineProperty(expressReq, 'originalUrl', {
+      value: fullUrl,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    })
     
-    // Garantir propriedades essenciais
+    Object.defineProperty(expressReq, 'path', {
+      value: pathOnly,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    })
+    
+    Object.defineProperty(expressReq, 'baseUrl', {
+      value: '',
+      writable: true,
+      enumerable: true,
+      configurable: true
+    })
+    
+    // Garantir método
     if (!expressReq.method) {
       expressReq.method = req.method || 'GET'
     }
+    
+    // Garantir query
     if (!expressReq.query) {
-      expressReq.query = {}
+      expressReq.query = req.query || {}
     }
-    // Não inicializar params - o Express vai preencher automaticamente das rotas
-    // expressReq.params será preenchido pelo Express router quando encontrar a rota
+    
+    // Params será preenchido pelo Express router
     if (!expressReq.params) {
       expressReq.params = {}
     }
     
     // Métodos do Express Request
-    if (typeof expressReq.get !== 'function') {
-      expressReq.get = function(name: string) {
-        return this.headers?.[name.toLowerCase()]
-      }
+    expressReq.get = function(name: string) {
+      return this.headers?.[name.toLowerCase()]
     }
     
-    if (typeof expressReq.header !== 'function') {
-      expressReq.header = function(name: string) {
-        return this.get(name)
-      }
+    expressReq.header = function(name: string) {
+      return this.get(name)
     }
     
-    // Para multipart/form-data, não passar body parseado
+    // Para multipart, remover body parseado
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
-      console.log('   Multipart detectado - body removido para Multer processar')
+      console.log('   Multipart detectado - body removido para Multer')
     }
     
-    // Processar no Express usando handle
+    console.log('🔧 Express Request configurado:')
+    console.log(`   url: ${expressReq.url}`)
+    console.log(`   path: ${expressReq.path}`)
+    console.log(`   method: ${expressReq.method}`)
+    
+    // Processar no Express
     return new Promise<void>((resolve) => {
       let finished = false
       
@@ -193,12 +199,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return result
       }
       
-      // Chamar o Express app diretamente como função
-      // O Express app é uma função que aceita (req, res, next)
+      // Chamar Express app diretamente
       expressApp(expressReq, res, (err?: any) => {
         if (err) {
           console.error('❌ Erro no Express:', err.message)
-          console.error('Stack:', err.stack)
           if (!res.headersSent) {
             try {
               res.status(500).json({
@@ -215,30 +219,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!res.headersSent) {
             console.error('❌ Rota não encontrada pelo Express!')
             console.error(`   Método: ${req.method}`)
-            console.error(`   Path esperado: ${pathOnly}`)
-            console.error(`   expressReq.path: ${expressReq.path}`)
+            console.error(`   Path: ${pathOnly}`)
             console.error(`   expressReq.url: ${expressReq.url}`)
-            console.error(`   expressReq.originalUrl: ${expressReq.originalUrl}`)
-            console.error(`   req.url original: ${req.url}`)
-            
-            // Verificar se é uma rota que deveria existir
-            const knownRoutes = [
-              '/api/login',
-              '/api/users',
-              '/api/users/:id',
-              '/api/videos/upload',
-              '/api/rewards',
-              '/api/submissions'
-            ]
-            const isKnownRoute = knownRoutes.some(route => {
-              const routePattern = route.replace(':id', '[^/]+')
-              const regex = new RegExp(`^${routePattern}$`)
-              return regex.test(pathOnly)
-            })
-            
-            if (isKnownRoute) {
-              console.error('⚠️  Esta rota DEVERIA existir! Problema no roteamento do Express.')
-            }
+            console.error(`   expressReq.path: ${expressReq.path}`)
             
             res.status(404).json({
               error: 'Rota não encontrada',
@@ -247,9 +230,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               debug: {
                 reqUrl: req.url,
                 expressReqPath: expressReq.path,
-                expressReqUrl: expressReq.url,
-                expressReqOriginalUrl: expressReq.originalUrl,
-                isKnownRoute: isKnownRoute
+                expressReqUrl: expressReq.url
               }
             })
           }
