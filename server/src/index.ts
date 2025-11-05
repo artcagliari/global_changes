@@ -27,14 +27,26 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Servir vídeos estáticos (uploads) com headers de cache
-app.use('/uploads/videos', (req, res, next) => {
-  // Headers para controlar cache de vídeos
-  res.set({
-    'Cache-Control': 'public, max-age=3600',
-    'ETag': `"${req.path}-${Date.now()}"`
+// No Vercel, não servimos arquivos estáticos do sistema de arquivos (read-only)
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
+if (!isVercel) {
+  app.use('/uploads/videos', (req, res, next) => {
+    // Headers para controlar cache de vídeos
+    res.set({
+      'Cache-Control': 'public, max-age=3600',
+      'ETag': `"${req.path}-${Date.now()}"`
+    })
+    next()
+  }, express.static(path.join(__dirname, '../uploads/videos')))
+} else {
+  // No Vercel, retornar erro 404 ou mensagem informativa
+  app.use('/uploads/videos', (req, res) => {
+    res.status(404).json({ 
+      error: 'Vídeo não disponível',
+      message: 'No Vercel, arquivos devem ser servidos via CDN ou storage externo (S3, Vercel Blob, etc.)'
+    })
   })
-  next()
-}, express.static(path.join(__dirname, '../uploads/videos')))
+}
 
 // Servir vídeos do front (public/videos) - para desenvolvimento
 if (process.env.NODE_ENV !== 'production') {

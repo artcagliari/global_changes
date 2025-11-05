@@ -428,16 +428,22 @@ router.patch('/submissions/:id/approve', async (req, res) => {
       data: { points: { increment: 1 } }
     })
 
-    // Deletar o arquivo físico do vídeo
-    const videoPath = path.join(__dirname, '..', '..', 'uploads', 'videos', submission.videoUrl)
-    try {
-      if (fs.existsSync(videoPath)) {
-        fs.unlinkSync(videoPath)
-        console.log('Arquivo de vídeo deletado:', submission.videoUrl)
+    // Deletar o arquivo físico do vídeo (apenas em desenvolvimento/local)
+    // No Vercel, não podemos deletar arquivos do sistema de arquivos (read-only)
+    const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
+    if (!isVercel) {
+      const videoPath = path.join(__dirname, '..', '..', 'uploads', 'videos', submission.videoUrl)
+      try {
+        if (fs.existsSync(videoPath)) {
+          fs.unlinkSync(videoPath)
+          console.log('Arquivo de vídeo deletado:', submission.videoUrl)
+        }
+      } catch (fileError) {
+        console.error('Erro ao deletar arquivo de vídeo:', fileError)
+        // Não falhar a aprovação se o arquivo não existir ou houver erro ao deletar
       }
-    } catch (fileError) {
-      console.error('Erro ao deletar arquivo de vídeo:', fileError)
-      // Não falhar a aprovação se o arquivo não existir ou houver erro ao deletar
+    } else {
+      console.log('⚠️  Vercel: não é possível deletar arquivo do sistema de arquivos (read-only)')
     }
 
     // Deletar o registro do banco de dados
