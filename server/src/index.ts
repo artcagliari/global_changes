@@ -101,6 +101,19 @@ if (process.env.NODE_ENV !== 'production') {
   app.use('/public/videos', express.static(path.join(__dirname, '../../public/videos')))
 }
 
+// Middleware para garantir que todas as requisições passem pelo Express
+// No Vercel, isso ajuda a garantir que as rotas sejam processadas
+app.use((req, res, next) => {
+  // Garantir que req.url e req.path estejam corretos
+  if (!req.path && req.url) {
+    req.path = req.url.split('?')[0]
+  }
+  if (!req.originalUrl && req.url) {
+    req.originalUrl = req.url
+  }
+  next()
+})
+
 // Rotas da API
 // IMPORTANTE: A ordem importa - rotas mais específicas primeiro
 app.use('/api/videos', videoRoutes) // Rotas específicas de vídeos
