@@ -32,19 +32,13 @@ let prismaBase = global.__prisma ?? new PrismaClient(prismaOptions)
 // Se estiver usando Accelerate, adicionar extensão
 if (isAccelerate) {
   try {
-    // Tentar carregar a extensão do Accelerate
-    // Nota: O pacote pode ter um nome diferente ou estar incluído no @prisma/client
-    const accelerateModule = await import('@prisma/extension-accelerate')
-    if (accelerateModule && accelerateModule.withAccelerate) {
-      prismaBase = prismaBase.$extends(accelerateModule.withAccelerate())
-      console.log('🚀 Prisma Accelerate ativado (cache e otimizações)')
-    } else {
-      console.warn('⚠️  Accelerate module não encontrado, continuando sem Accelerate')
-    }
+    // Carregar a extensão do Accelerate
+    const { withAccelerate } = require('@prisma/extension-accelerate')
+    prismaBase = prismaBase.$extends(withAccelerate())
+    console.log('🚀 Prisma Accelerate ativado (cache e otimizações)')
   } catch (error: any) {
     console.warn('⚠️  Não foi possível carregar Prisma Accelerate:', error.message)
     console.warn('   Continuando sem Accelerate (usando PostgreSQL direto)')
-    console.warn('   Para usar Accelerate, instale: npm install @prisma/extension-accelerate')
   }
 }
 
