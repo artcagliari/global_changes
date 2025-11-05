@@ -111,6 +111,15 @@ app.use((req, res, next) => {
   if (!req.originalUrl && req.url) {
     req.originalUrl = req.url
   }
+  
+  // Log detalhado no Vercel
+  if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
+    console.log(`🔍 Express Middleware: ${req.method} ${req.path}`)
+    console.log(`   url: ${req.url}`)
+    console.log(`   originalUrl: ${req.originalUrl}`)
+    console.log(`   baseUrl: ${req.baseUrl}`)
+  }
+  
   next()
 })
 
@@ -118,6 +127,22 @@ app.use((req, res, next) => {
 // IMPORTANTE: A ordem importa - rotas mais específicas primeiro
 app.use('/api/videos', videoRoutes) // Rotas específicas de vídeos
 app.use('/api', apiRoutes) // Rotas de gerenciamento (users, rewards, submissions)
+
+// Log de rotas registradas (apenas no Vercel)
+if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
+  console.log('✅ Rotas registradas no Express:')
+  console.log('   /api/videos/upload (POST)')
+  console.log('   /api/login (POST)')
+  console.log('   /api/users (GET, POST)')
+  console.log('   /api/users/:id (GET, PATCH, DELETE)')
+  console.log('   /api/users/:id/redeemed-rewards (GET)')
+  console.log('   /api/rewards (GET, POST)')
+  console.log('   /api/rewards/:id (PATCH, DELETE)')
+  console.log('   /api/rewards/:id/redeem (POST)')
+  console.log('   /api/submissions (GET, POST)')
+  console.log('   /api/submissions/:id/approve (PATCH)')
+  console.log('   /api/submissions/:id/reject (PATCH)')
+}
 
 // Debug: listar todas as rotas registradas (apenas no Vercel)
 if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
