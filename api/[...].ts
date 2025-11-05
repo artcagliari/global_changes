@@ -32,19 +32,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, a URL vem completa como /api/rewards, /api/users/:id, etc.
-    const originalUrl = req.url || ''
-    const path = originalUrl.split('?')[0]
-    const finalPath = path.startsWith('/api') ? path : `/api${path || ''}`
-    const queryString = originalUrl.includes('?') ? '?' + originalUrl.split('?')[1] : ''
+    // No Vercel com api/[...].ts, o path vem em req.query como um objeto
+    // Exemplo: /api/users/123 -> req.query = { '0': 'users', '1': '123' }
+    // Ou pode vir em req.url diretamente
+    let url = req.url || ''
+    
+    // Se não tiver URL, construir a partir do query
+    // No Vercel, quando usa [...], os segmentos vêm como req.query['0'], req.query['1'], etc.
+    if (!url && req.query) {
+      const queryKeys = Object.keys(req.query).sort()
+      const pathSegments: string[] = []
+      
+      // Coletar todos os segmentos numéricos
+      for (let i = 0; i < queryKeys.length; i++) {
+        const key = String(i)
+        if (req.query[key]) {
+          pathSegments.push(String(req.query[key]))
+        }
+      }
+      
+      if (pathSegments.length > 0) {
+        url = '/' + pathSegments.join('/')
+      }
+    }
+    
+    // Garantir que comece com /
+    if (!url.startsWith('/')) {
+      url = '/' + url
+    }
+    
+    // Garantir que comece com /api
+    const path = url.split('?')[0]
+    const finalPath = path.startsWith('/api') ? path : `/api${path}`
+    const queryString = url.includes('?') ? '?' + url.split('?')[1] : ''
     const finalUrl = finalPath + queryString
     
-    console.log(`📨 ${req.method} ${finalPath} (original: ${req.url})`)
+    console.log(`📨 ${req.method} ${finalPath}`)
+    console.log(`   URL original do Vercel: ${req.url}`)
+    console.log(`   URL construída: ${url}`)
+    console.log(`   URL final para Express: ${finalUrl}`)
+    console.log(`   Query params:`, req.query)
     
     // Criar objeto request compatível com Express
-    // O Express precisa que req.url, req.path, req.originalUrl estejam corretos
-    const expressReq = {
-      ...req,
+    // Usar o req do Vercel mas adicionar propriedades necessárias
+    const expressReq = Object.create(req) as any
+    
+    // Sobrescrever propriedades essenciais
+    Object.assign(expressReq, {
       url: finalUrl,
       originalUrl: finalUrl,
       path: finalPath,
@@ -66,16 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       secure: true,
       hostname: req.headers?.['host'] || 'localhost',
       ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
-    } as any
-    
-    // Garantir que o Express possa processar o request corretamente
-    // Adicionar propriedades necessárias para o router do Express
-    if (!expressReq.route) {
-      expressReq.route = undefined
-    }
-    if (!expressReq.res) {
-      expressReq.res = res
-    }
+    })
     
     // Processar no Express usando callback
     return new Promise<void>((resolve) => {
