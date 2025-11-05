@@ -9,4 +9,11 @@ server/test-login.ts
 server/prisma/migrate-data.ts
 *.md
 !README.md
+PASSO_A_PASSO_POSTGRES.md
+MIGRATION_GUIDE.md
+DEBUG_LOGIN.md
+URGENTE_VERCEL.md
+VERCEL_ISSUES.md
+VERCEL_SETUP.md
+DEPLOY.md
 

@@ -5,7 +5,6 @@
   "functions": {
     "api/**/*.ts": {
       "includeFiles": "server/src/**",
-      "excludeFiles": "server/node_modules/**",
       "maxDuration": 30
     }
   },
