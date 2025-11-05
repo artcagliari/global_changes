@@ -33,20 +33,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, o req.url pode vir de diferentes formas:
-    // 1. Se o rewrite no vercel.json mantém /api: req.url = '/api/users/123'
-    // 2. Se o rewrite remove /api: req.url = '/users/123'
-    // 3. Os segmentos podem vir em req.query quando usa [...]
-    
+    // No Vercel com api/[...].ts, o path vem em req.url
+    // Mas pode vir de diferentes formas dependendo do rewrite
     let url = req.url || ''
     
     console.log('🔍 DEBUG Vercel Request:')
     console.log(`   req.url: ${req.url}`)
     console.log(`   req.method: ${req.method}`)
-    console.log(`   req.query:`, JSON.stringify(req.query))
+    console.log(`   Content-Type: ${req.headers['content-type']}`)
     
-    // Se não tiver URL ou for apenas '/', construir a partir do query
-    // Quando usa [...], os segmentos vêm em req.query como '0', '1', etc.
+    // Se não tiver URL, construir a partir do query (quando usa [...])
     if (!url || url === '/') {
       if (req.query && Object.keys(req.query).length > 0) {
         const segments: string[] = []
@@ -62,8 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
-    // IMPORTANTE: No Vercel com api/[...].ts, o path pode não incluir /api
-    // Precisamos adicionar /api se não tiver
+    // Garantir que comece com /api
     if (!url.startsWith('/api')) {
       url = '/api' + (url.startsWith('/') ? url : '/' + url)
     }
@@ -75,68 +70,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`📨 ${req.method} ${pathOnly}`)
     console.log(`   URL final: ${fullUrl}`)
     
-    // IMPORTANTE: Para uploads multipart/form-data, não processar o body aqui
-    // O Multer precisa processar o body raw antes do Express
-    const isMultipart = req.headers['content-type']?.includes('multipart/form-data')
+    // Usar req do Vercel diretamente, apenas ajustando propriedades essenciais
+    // O Express precisa que url, originalUrl, path estejam corretos
+    const expressReq = req as any
     
-    // Criar um objeto request que o Express possa processar
-    // O Express precisa que o request tenha propriedades específicas
-    const expressReq = {
-      ...req,
-      url: fullUrl,
-      originalUrl: fullUrl,
-      path: pathOnly,
-      baseUrl: '',
-      method: req.method || 'GET',
-      query: req.query || {},
-      params: {},
-      // Para multipart, não passar body parseado - deixar o Multer processar
-      body: isMultipart ? undefined : req.body,
-      headers: req.headers || {},
-      // Métodos do Express Request
-      get: function(name: string) {
+    // Ajustar propriedades que o Express precisa para fazer match com rotas
+    expressReq.url = fullUrl
+    expressReq.originalUrl = fullUrl
+    expressReq.path = pathOnly
+    expressReq.baseUrl = ''
+    
+    // Garantir que propriedades essenciais existam
+    if (!expressReq.method) {
+      expressReq.method = req.method || 'GET'
+    }
+    if (!expressReq.query) {
+      expressReq.query = {}
+    }
+    if (!expressReq.params) {
+      expressReq.params = {}
+    }
+    
+    // Métodos do Express Request
+    if (typeof expressReq.get !== 'function') {
+      expressReq.get = function(name: string) {
         const headers = this.headers || {}
         return headers[name.toLowerCase()]
-      },
-      header: function(name: string) {
-        return this.get(name)
-      },
-      // Propriedades adicionais necessárias
-      protocol: 'https',
-      secure: true,
-      hostname: req.headers?.['host']?.split(':')[0] || 'localhost',
-      ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
-      // Propriedades do Express
-      route: undefined,
-      res: res,
-      // Propriedades do Node.js IncomingMessage (para compatibilidade)
-      httpVersion: '1.1',
-      httpVersionMajor: 1,
-      httpVersionMinor: 1,
-      complete: false,
-      rawHeaders: [],
-      rawTrailers: [],
-      trailers: {},
-      upgrade: false,
-      aborted: false,
-      read: function() {},
-      setEncoding: function() {},
-      pause: function() {},
-      resume: function() {},
-      destroy: function() {},
-    } as any
+      }
+    }
     
-    // Processar a requisição no Express usando Promise
+    if (typeof expressReq.header !== 'function') {
+      expressReq.header = function(name: string) {
+        return this.get(name)
+      }
+    }
+    
+    // Para multipart/form-data, remover body parseado se existir
+    // O Multer precisa processar o body raw
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
+      delete expressReq.body
+    }
+    
+    // Processar no Express usando handle diretamente
     return new Promise<void>((resolve) => {
       let finished = false
       let responseSent = false
       
-      const checkFinished = () => {
-        if (res.headersSent || responseSent) {
-          if (!finished) {
-            finished = true
-            resolve()
-          }
+      const finish = () => {
+        if (!finished) {
+          finished = true
+          resolve()
         }
       }
       
@@ -145,7 +128,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.end = function(...args: any[]) {
         responseSent = true
         const result = originalEnd(...args)
-        setTimeout(checkFinished, 10)
+        finish()
         return result
       }
       
@@ -153,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.json = function(body?: any) {
         responseSent = true
         const result = originalJson(body)
-        setTimeout(checkFinished, 10)
+        finish()
         return result
       }
       
@@ -161,12 +144,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.send = function(body?: any) {
         responseSent = true
         const result = originalSend(body)
-        setTimeout(checkFinished, 10)
+        finish()
         return result
       }
       
-      // Processar com Express
-      expressApp(expressReq, res, (err?: any) => {
+      // Usar handle do Express diretamente
+      // Isso garante que o Express processe o request corretamente
+      expressApp.handle(expressReq, res, (err?: any) => {
         if (err) {
           console.error('❌ Erro no Express:', err)
           if (!res.headersSent) {
@@ -177,10 +161,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               })
               responseSent = true
             } catch (sendError) {
-              console.error('Erro ao enviar resposta de erro:', sendError)
+              console.error('Erro ao enviar resposta:', sendError)
             }
           }
-          checkFinished()
+          finish()
         } else {
           // Se não houve erro mas a resposta não foi enviada, o Express não encontrou a rota
           if (!res.headersSent && !responseSent) {
@@ -190,6 +174,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.error(`   URL: ${fullUrl}`)
             console.error(`   req.url original: ${req.url}`)
             console.error(`   req.query:`, req.query)
+            console.error(`   expressReq.path: ${expressReq.path}`)
+            console.error(`   expressReq.url: ${expressReq.url}`)
             
             res.status(404).json({
               error: 'Rota não encontrada',
@@ -199,12 +185,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               debug: {
                 reqUrl: req.url,
                 query: req.query,
-                finalPath: pathOnly
+                finalPath: pathOnly,
+                expressReqPath: expressReq.path,
+                expressReqUrl: expressReq.url
               }
             })
             responseSent = true
           }
-          checkFinished()
+          finish()
         }
       })
       
@@ -216,8 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.status(504).json({ error: 'Timeout' })
             responseSent = true
           }
-          finished = true
-          resolve()
+          finish()
         }
       }, 30000)
     })
@@ -228,9 +215,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!res.headersSent) {
       try {
         res.status(500).json({
-      error: 'Erro ao processar requisição',
-      message: error.message
-    })
+          error: 'Erro ao processar requisição',
+          message: error.message
+        })
       } catch (sendError) {
         console.error('Erro ao enviar resposta:', sendError)
       }
