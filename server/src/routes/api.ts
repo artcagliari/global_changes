@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { prisma } from '../lib/prisma.js'
+import { prisma, ensureConnection } from '../lib/prisma.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -14,6 +14,11 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
     
+    // Validação básica
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' })
+    }
+    
     console.log('🔐 Tentativa de login:', { email, password: '***' })
     
     // Verificar se DATABASE_URL está configurado
@@ -27,20 +32,18 @@ router.post('/login', async (req, res) => {
     
     console.log('🔍 DATABASE_URL configurado:', process.env.DATABASE_URL.substring(0, 20) + '...')
     
-    // Verificar se Prisma está conectado
-    try {
-      await prisma.$connect()
-      console.log('✅ Prisma conectado ao banco')
-    } catch (prismaError: any) {
-      console.error('❌ Erro ao conectar Prisma:', prismaError.message)
-      console.error('Código:', prismaError.code)
+    // Garantir conexão com o banco
+    const connected = await ensureConnection()
+    if (!connected) {
+      console.error('❌ Não foi possível conectar ao banco de dados')
       return res.status(500).json({ 
         error: 'Erro de conexão com banco de dados',
-        message: prismaError.message,
-        code: prismaError.code,
-        hint: 'Verifique se DATABASE_URL está correto no Vercel'
+        message: 'Não foi possível conectar ao banco. Verifique se DATABASE_URL está correto no Vercel.',
+        hint: 'Verifique as variáveis de ambiente no Vercel'
       })
     }
+    
+    console.log('✅ Prisma conectado ao banco')
     
     // Simulação de senha (em produção, usar hash)
     if (password !== '123') {
@@ -48,6 +51,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' })
     }
     
+    // Buscar usuário
     console.log('🔍 Buscando usuário:', email)
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() }
@@ -59,22 +63,41 @@ router.post('/login', async (req, res) => {
     }
     
     console.log('✅ Login bem-sucedido:', user.email, user.name)
-    res.json(user)
+    
+    // Retornar usuário sem informações sensíveis
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      points: user.points,
+      createdAt: user.createdAt
+    })
   } catch (error: any) {
     console.error('❌ Erro no login:', error.message)
     console.error('Stack:', error.stack)
     console.error('Código:', error.code)
     console.error('Nome:', error.name)
     
-    // Mensagem mais clara para o usuário
+    // Mensagem mais clara para o usuário baseada no código de erro
     let userMessage = 'Erro ao fazer login'
+    let statusCode = 500
+    
     if (error.code === 'P1001') {
       userMessage = 'Não foi possível conectar ao banco de dados. Verifique se DATABASE_URL está configurado no Vercel.'
+      statusCode = 500
     } else if (error.code === 'P1000') {
-      userMessage = 'Falha na autenticação do banco de dados. Verifique as credenciais.'
+      userMessage = 'Falha na autenticação do banco de dados. Verifique as credenciais do banco.'
+      statusCode = 500
+    } else if (error.code === 'P2002') {
+      userMessage = 'Erro de integridade de dados'
+      statusCode = 500
+    } else if (error.name === 'PrismaClientInitializationError') {
+      userMessage = 'Erro ao inicializar conexão com banco de dados. Verifique DATABASE_URL.'
+      statusCode = 500
     }
     
-    res.status(500).json({ 
+    res.status(statusCode).json({ 
       error: userMessage,
       message: error.message,
       code: error.code 

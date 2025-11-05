@@ -13,21 +13,30 @@ if (!process.env.DATABASE_URL) {
   console.error('Valor esperado: postgres://...')
 }
 
+// Configuração otimizada para serverless
+const prismaOptions = {
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+}
+
 export const prisma =
   global.__prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  })
+  new PrismaClient(prismaOptions)
 
 // Sempre manter instância global (especialmente importante para Vercel serverless)
+// Em serverless, precisamos manter a instância global para evitar múltiplas conexões
 global.__prisma = prisma
 
-// Testar conexão na inicialização
-prisma.$connect()
-  .then(() => {
-    console.log('✅ Prisma conectado ao banco de dados')
-  })
-  .catch((error: any) => {
+// Função auxiliar para garantir conexão
+export async function ensureConnection() {
+  try {
+    await prisma.$connect()
+    return true
+  } catch (error: any) {
     console.error('❌ Erro ao conectar Prisma:', error.message)
-    console.error('Verifique se DATABASE_URL está configurado corretamente')
-  })
+    console.error('Código:', error.code)
+    return false
+  }
+}
+
+// Não conectar na inicialização em serverless (conexão lazy)
+// A conexão será feita quando necessário

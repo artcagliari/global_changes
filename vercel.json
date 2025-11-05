@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build && cd server && npm run prisma:generate && cd ..",
+  "buildCommand": "npm run build && cd server && npx prisma generate && cd ..",
   "outputDirectory": "dist",
   "installCommand": "npm install && cd server && npm install && cd ..",
   "functions": {
