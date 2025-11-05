@@ -47,9 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('📋 Body:', req.body ? JSON.stringify(req.body).substring(0, 100) : 'empty')
     
     // Criar um objeto request que o Express possa processar
-    // O Express precisa de um objeto que se comporte como IncomingMessage
-    const expressReq = {
-      ...req,
+    // Usar req diretamente mas sobrescrever propriedades necessárias
+    const expressReq = Object.assign(req, {
       url: finalUrl,
       originalUrl: finalUrl,
       path: finalPath,
@@ -67,16 +66,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       header: function(name: string) {
         return this.get(name)
       },
-      // Propriedades adicionais
+      // Propriedades adicionais necessárias
       protocol: 'https',
       secure: true,
       hostname: req.headers?.['host'] || 'localhost',
       ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
-      // Propriedades necessárias para o Express router
+      // Propriedades do Express
       route: undefined,
       res: undefined,
       next: undefined,
-    } as any
+      // Garantir que seja reconhecido como request válido
+      connection: {},
+      socket: {},
+      httpVersion: '1.1',
+      httpVersionMajor: 1,
+      httpVersionMinor: 1,
+      complete: false,
+      rawHeaders: [],
+      rawTrailers: [],
+      trailers: {},
+      upgrade: false,
+      aborted: false,
+      read: function() {},
+      setEncoding: function() {},
+      pause: function() {},
+      resume: function() {},
+      destroy: function() {},
+    }) as any
     
     // Processar no Express usando callback
     return new Promise<void>((resolve) => {
