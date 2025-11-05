@@ -15,6 +15,19 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body
     
     console.log('🔐 Tentativa de login:', { email, password: '***' })
+    console.log('🔍 DATABASE_URL configurado:', !!process.env.DATABASE_URL)
+    
+    // Verificar se Prisma está conectado
+    try {
+      await prisma.$connect()
+      console.log('✅ Prisma conectado')
+    } catch (prismaError: any) {
+      console.error('❌ Erro ao conectar Prisma:', prismaError.message)
+      return res.status(500).json({ 
+        error: 'Erro de conexão com banco de dados',
+        message: prismaError.message 
+      })
+    }
     
     // Simulação de senha (em produção, usar hash)
     if (password !== '123') {
@@ -35,8 +48,13 @@ router.post('/login', async (req, res) => {
     res.json(user)
   } catch (error: any) {
     console.error('❌ Erro no login:', error.message)
-    console.error(error.stack)
-    res.status(500).json({ error: 'Erro no login', message: error.message })
+    console.error('Stack:', error.stack)
+    console.error('Código:', error.code)
+    res.status(500).json({ 
+      error: 'Erro no login', 
+      message: error.message,
+      code: error.code 
+    })
   }
 })
 

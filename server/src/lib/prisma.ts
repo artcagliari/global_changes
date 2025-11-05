@@ -1,14 +1,20 @@
 import { PrismaClient } from '@prisma/client'
 
-// Singleton pattern para serverless functions
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+// Singleton pattern para serverless functions (Vercel)
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined
 }
 
 export const prisma =
-  globalForPrisma.prisma ??
+  global.__prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   })
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+// Manter instância global em produção (Vercel serverless)
+if (process.env.NODE_ENV === 'production') {
+  global.__prisma = prisma
+} else if (process.env.NODE_ENV !== 'production') {
+  global.__prisma = prisma
+}
