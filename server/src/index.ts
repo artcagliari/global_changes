@@ -14,10 +14,42 @@ const app = express()
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? (process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : true))
-    : true, // Permite qualquer origem em desenvolvimento (localhost em qualquer porta)
-  credentials: true
+  origin: function (origin, callback) {
+    // Em desenvolvimento, permitir qualquer origem
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true)
+    }
+    
+    // Em produção no Vercel, permitir:
+    // 1. A URL do frontend configurada
+    // 2. A URL do Vercel (se disponível)
+    // 3. Qualquer origem se não tiver origin (alguns casos especiais)
+    const allowedOrigins = []
+    
+    if (process.env.FRONTEND_URL) {
+      allowedOrigins.push(process.env.FRONTEND_URL)
+    }
+    
+    if (process.env.VERCEL_URL) {
+      allowedOrigins.push(`https://${process.env.VERCEL_URL}`)
+      allowedOrigins.push(`https://*.vercel.app`)
+    }
+    
+    // Se não tiver origin (ex: requisições do mesmo domínio), permitir
+    if (!origin) {
+      return callback(null, true)
+    }
+    
+    // Verificar se a origem está permitida
+    if (allowedOrigins.length === 0 || allowedOrigins.some(allowed => origin.includes(allowed.replace('*.', '')))) {
+      callback(null, true)
+    } else {
+      callback(null, true) // Permitir por enquanto para debug
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }))
 
 // Middleware de debug para verificar rotas no Vercel
