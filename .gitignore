@@ -25,7 +25,9 @@ server/prisma/*.db
 server/prisma/*.db-journal
 
 # Uploads
-server/uploads/**
+server/uploads/videos/*
+!server/uploads/videos/.gitkeep
+server/uploads/*
 !server/uploads/.gitkeep
 
 # Editor directories and files
