@@ -193,11 +193,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return result
       }
       
-      // Usar o app Express diretamente (como função) ou handle
-      // Tentar ambas as formas para garantir compatibilidade
-      const expressHandler = expressApp.handle || expressApp
-      
-      expressHandler.call(expressApp, expressReq, res, (err?: any) => {
+      // Chamar o Express app diretamente como função
+      // O Express app é uma função que aceita (req, res, next)
+      expressApp(expressReq, res, (err?: any) => {
         if (err) {
           console.error('❌ Erro no Express:', err.message)
           console.error('Stack:', err.stack)
