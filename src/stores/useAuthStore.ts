@@ -15,21 +15,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (email, password) => {
     try {
-      const response = await fetch(`${API_URL}/api/login`, {
+      const url = `${API_URL}/api/login`
+      console.log('🔐 Tentando login em:', url)
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       })
 
+      console.log('📡 Resposta do servidor:', response.status, response.statusText)
+
       if (!response.ok) {
-        return false
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Erro no login:', errorData)
+        throw new Error(errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`)
       }
 
       const user = await response.json()
+      console.log('✅ Login bem-sucedido:', user.email)
       set({ currentUser: user })
       return true
     } catch (error) {
-      console.error('Erro no login:', error)
+      console.error('❌ Erro no login:', error)
+      if (error instanceof Error) {
+        console.error('Mensagem:', error.message)
+      }
       return false
     }
   },

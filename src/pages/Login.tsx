@@ -13,17 +13,23 @@ const LoginPage = () => {
     e.preventDefault()
     setError('')
     
-    const success = await login(email, password)
+    try {
+      const success = await login(email, password)
 
-    if (success) {
-      const user = useAuthStore.getState().currentUser
-      if (user?.role === 'admin') {
-        navigate('/admin')
+      if (success) {
+        const user = useAuthStore.getState().currentUser
+        if (user?.role === 'admin') {
+          navigate('/admin')
+        } else {
+          navigate('/dashboard')
+        }
       } else {
-        navigate('/dashboard')
+        setError('Credenciais inválidas. (Tente admin@escola.com com a senha: 123)')
       }
-    } else {
-      setError('Credenciais inválidas. (Tente admin@escola.com com a senha: 123)')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao fazer login. Verifique sua conexão.'
+      setError(errorMessage)
+      console.error('Erro no login:', err)
     }
   }
 
