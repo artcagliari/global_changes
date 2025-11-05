@@ -17,17 +17,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const url = `${API_URL}/api/login`
       console.log('🔐 Tentando login em:', url)
+      console.log('📡 API_URL configurada:', API_URL)
       
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        // Adicionar opções para melhor tratamento de erros
+        signal: AbortSignal.timeout(30000) // Timeout de 30 segundos
       })
 
       console.log('📡 Resposta do servidor:', response.status, response.statusText)
+      console.log('📡 Headers da resposta:', Object.fromEntries(response.headers.entries()))
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
+        let errorData = {}
+        try {
+          const text = await response.text()
+          console.log('📄 Corpo da resposta de erro:', text)
+          errorData = text ? JSON.parse(text) : {}
+        } catch (parseError) {
+          console.warn('⚠️  Não foi possível parsear resposta de erro')
+        }
+        
         console.error('❌ Erro no login:', errorData)
         throw new Error(errorData.error || errorData.message || `Erro ${response.status}: ${response.statusText}`)
       }
@@ -39,7 +51,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('❌ Erro no login:', error)
       if (error instanceof Error) {
+        console.error('Tipo:', error.name)
         console.error('Mensagem:', error.message)
+        console.error('Stack:', error.stack)
+        
+        // Se for erro de rede, mostrar mensagem mais clara
+        if (error.name === 'TypeError' && error.message.includes('Load failed')) {
+          console.error('🔴 Erro de rede: A requisição falhou. Verifique se o servidor está acessível.')
+        }
       }
       return false
     }
