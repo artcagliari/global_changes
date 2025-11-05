@@ -12,9 +12,5 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   })
 
-// Manter instância global em produção (Vercel serverless)
-if (process.env.NODE_ENV === 'production') {
-  global.__prisma = prisma
-} else if (process.env.NODE_ENV !== 'production') {
-  global.__prisma = prisma
-}
+// Sempre manter instância global (especialmente importante para Vercel serverless)
+global.__prisma = prisma
