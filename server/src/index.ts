@@ -125,8 +125,17 @@ app.use((req, res, next) => {
 
 // Rotas da API
 // IMPORTANTE: A ordem importa - rotas mais específicas primeiro
-app.use('/api/videos', videoRoutes) // Rotas específicas de vídeos
-app.use('/api', apiRoutes) // Rotas de gerenciamento (users, rewards, submissions)
+// No Vercel, o handler já adiciona /api, então as rotas devem ser montadas sem /api
+// Mas também precisamos suportar com /api para desenvolvimento local
+if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
+  // No Vercel, o handler já adiciona /api, então montamos com /api
+  app.use('/api/videos', videoRoutes)
+  app.use('/api', apiRoutes)
+} else {
+  // Em desenvolvimento, também montar com /api
+  app.use('/api/videos', videoRoutes)
+  app.use('/api', apiRoutes)
+}
 
 // Log de rotas registradas (apenas no Vercel)
 if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
