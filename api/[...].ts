@@ -33,17 +33,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, o path vem em req.url
-    // Mas pode vir de diferentes formas dependendo do rewrite
-    let url = req.url || ''
+    // No Vercel com api/[...].ts, o path pode vir de diferentes formas:
+    // - req.url pode ser '/api/videos/upload' (se o rewrite mantém /api)
+    // - req.url pode ser '/videos/upload' (se o rewrite remove /api)
+    // - req.query pode ter os segmentos quando usa [...]
+    
+    let path = req.url || ''
     
     console.log('🔍 DEBUG Vercel Request:')
-    console.log(`   req.url: ${req.url}`)
+    console.log(`   req.url original: ${req.url}`)
     console.log(`   req.method: ${req.method}`)
+    console.log(`   req.query:`, JSON.stringify(req.query))
     console.log(`   Content-Type: ${req.headers['content-type']}`)
     
-    // Se não tiver URL, construir a partir do query (quando usa [...])
-    if (!url || url === '/') {
+    // Se não tiver URL ou for apenas '/', construir a partir do query
+    if (!path || path === '/') {
       if (req.query && Object.keys(req.query).length > 0) {
         const segments: string[] = []
         let i = 0
@@ -52,35 +56,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           i++
         }
         if (segments.length > 0) {
-          url = '/' + segments.join('/')
-          console.log(`   URL construída do query: ${url}`)
+          path = '/' + segments.join('/')
+          console.log(`   Path construído do query: ${path}`)
         }
       }
     }
     
-    // Garantir que comece com /api
-    if (!url.startsWith('/api')) {
-      url = '/api' + (url.startsWith('/') ? url : '/' + url)
+    // Se o path não começar com /api, adicionar
+    // Mas verificar primeiro se já tem /api para não duplicar
+    if (!path.startsWith('/api')) {
+      path = '/api' + (path.startsWith('/') ? path : '/' + path)
+      console.log(`   Path ajustado para incluir /api: ${path}`)
     }
     
     // Separar path e query string
-    const [pathOnly, queryString] = url.split('?')
-    const fullUrl = pathOnly + (queryString ? '?' + queryString : '')
+    const [pathOnly] = path.split('?')
+    const fullUrl = path
     
     console.log(`📨 ${req.method} ${pathOnly}`)
-    console.log(`   URL final: ${fullUrl}`)
+    console.log(`   URL completa: ${fullUrl}`)
     
-    // Usar req do Vercel diretamente, apenas ajustando propriedades essenciais
-    // O Express precisa que url, originalUrl, path estejam corretos
+    // Usar req do Vercel diretamente, ajustando apenas as propriedades essenciais
     const expressReq = req as any
     
-    // Ajustar propriedades que o Express precisa para fazer match com rotas
+    // Ajustar propriedades que o Express precisa
+    // IMPORTANTE: O Express router usa req.path para fazer match
     expressReq.url = fullUrl
     expressReq.originalUrl = fullUrl
     expressReq.path = pathOnly
     expressReq.baseUrl = ''
     
-    // Garantir que propriedades essenciais existam
+    // Garantir propriedades essenciais
     if (!expressReq.method) {
       expressReq.method = req.method || 'GET'
     }
@@ -94,8 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Métodos do Express Request
     if (typeof expressReq.get !== 'function') {
       expressReq.get = function(name: string) {
-        const headers = this.headers || {}
-        return headers[name.toLowerCase()]
+        return this.headers?.[name.toLowerCase()]
       }
     }
     
@@ -105,16 +110,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
-    // Para multipart/form-data, remover body parseado se existir
-    // O Multer precisa processar o body raw
+    // Para multipart/form-data, não passar body parseado
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
+      console.log('   Multipart detectado - body removido para Multer processar')
     }
     
-    // Processar no Express usando handle diretamente
+    // Processar no Express usando handle
     return new Promise<void>((resolve) => {
       let finished = false
-      let responseSent = false
       
       const finish = () => {
         if (!finished) {
@@ -126,7 +130,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Interceptar métodos de resposta
       const originalEnd = res.end.bind(res)
       res.end = function(...args: any[]) {
-        responseSent = true
         const result = originalEnd(...args)
         finish()
         return result
@@ -134,7 +137,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       const originalJson = res.json.bind(res)
       res.json = function(body?: any) {
-        responseSent = true
         const result = originalJson(body)
         finish()
         return result
@@ -142,74 +144,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       const originalSend = res.send.bind(res)
       res.send = function(body?: any) {
-        responseSent = true
         const result = originalSend(body)
         finish()
         return result
       }
       
-      // Usar handle do Express diretamente
-      // Isso garante que o Express processe o request corretamente
+      // Usar handle do Express
       expressApp.handle(expressReq, res, (err?: any) => {
         if (err) {
-          console.error('❌ Erro no Express:', err)
+          console.error('❌ Erro no Express:', err.message)
+          console.error('Stack:', err.stack)
           if (!res.headersSent) {
             try {
               res.status(500).json({
                 error: 'Erro interno do servidor',
                 message: err.message
               })
-              responseSent = true
             } catch (sendError) {
               console.error('Erro ao enviar resposta:', sendError)
             }
           }
           finish()
         } else {
-          // Se não houve erro mas a resposta não foi enviada, o Express não encontrou a rota
-          if (!res.headersSent && !responseSent) {
-            console.error('❌ Rota não encontrada pelo Express!')
+          // Se não houve erro mas resposta não foi enviada, rota não encontrada
+          if (!res.headersSent) {
+            console.error('❌ Rota não encontrada!')
             console.error(`   Método: ${req.method}`)
-            console.error(`   Path: ${pathOnly}`)
-            console.error(`   URL: ${fullUrl}`)
-            console.error(`   req.url original: ${req.url}`)
-            console.error(`   req.query:`, req.query)
+            console.error(`   Path esperado: ${pathOnly}`)
             console.error(`   expressReq.path: ${expressReq.path}`)
             console.error(`   expressReq.url: ${expressReq.url}`)
+            console.error(`   expressReq.originalUrl: ${expressReq.originalUrl}`)
+            console.error(`   req.url original: ${req.url}`)
             
             res.status(404).json({
               error: 'Rota não encontrada',
               path: pathOnly,
               method: req.method,
-              originalUrl: req.url,
               debug: {
                 reqUrl: req.url,
-                query: req.query,
-                finalPath: pathOnly,
                 expressReqPath: expressReq.path,
-                expressReqUrl: expressReq.url
+                expressReqUrl: expressReq.url,
+                expressReqOriginalUrl: expressReq.originalUrl
               }
             })
-            responseSent = true
           }
           finish()
         }
       })
       
-      // Timeout de segurança
+      // Timeout
       setTimeout(() => {
         if (!finished) {
           console.warn('⚠️  Timeout após 30s')
-          if (!res.headersSent && !responseSent) {
+          if (!res.headersSent) {
             res.status(504).json({ error: 'Timeout' })
-            responseSent = true
           }
           finish()
         }
       }, 30000)
     })
   } catch (error: any) {
-    console.error('❌ Erro no handler do Vercel:', error.message)
+    console.error('❌ Erro no handler:', error.message)
     console.error('Stack:', error.stack)
     
     if (!res.headersSent) {
