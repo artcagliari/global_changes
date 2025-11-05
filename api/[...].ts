@@ -16,8 +16,32 @@ async function getApp() {
       }
       
       // Importar o app Express
-      const serverModule = await import('../server/src/index.js')
+      // Tentar diferentes caminhos dependendo do ambiente
+      let serverModule: any = null
+      let importError: any = null
+      
+      // Tentar primeiro o caminho direto (TypeScript/compilado)
+      try {
+        serverModule = await import('../server/src/index.js')
+        console.log('✅ Importado de ../server/src/index.js')
+      } catch (error: any) {
+        importError = error
+        console.log('⚠️  Não conseguiu importar de ../server/src/index.js')
+        // Tentar caminho compilado
+        try {
+          serverModule = await import('../server/dist/index.js')
+          console.log('✅ Importado de ../server/dist/index.js')
+        } catch (error2: any) {
+          console.error('❌ Não conseguiu importar de nenhum caminho')
+          throw importError
+        }
+      }
+      
       app = serverModule.default
+      
+      if (!app) {
+        throw new Error('App Express não foi exportado corretamente')
+      }
       
       console.log('✅ Servidor Express carregado com sucesso')
     } catch (error: any) {
@@ -30,8 +54,15 @@ async function getApp() {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Log IMEDIATO quando o handler é chamado
+  console.log('🚀 Handler do Vercel chamado!')
+  console.log(`   Método: ${req.method}`)
+  console.log(`   URL: ${req.url}`)
+  console.log(`   Query:`, JSON.stringify(req.query))
+  
   try {
     const expressApp = await getApp()
+    console.log('✅ Express app obtido com sucesso')
     
     // No Vercel com api/[...].ts, o path pode vir de diferentes formas:
     // - req.url pode ser '/api/videos/upload' (se o rewrite mantém /api)
