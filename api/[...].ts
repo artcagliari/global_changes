@@ -41,27 +41,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`📨 ${req.method} ${finalPath}`)
     
     // Criar objeto request compatível com Express
-    // Usar Object.create para criar um objeto que herda de req
-    const expressReq = Object.create(req) as any
-    
-    // Sobrescrever propriedades necessárias
-    expressReq.url = finalUrl
-    expressReq.originalUrl = finalUrl
-    expressReq.path = finalPath
-    expressReq.baseUrl = ''
-    expressReq.method = req.method || 'GET'
-    expressReq.query = req.query || {}
-    expressReq.params = {}
-    
-    // Adicionar métodos do Express se não existirem
-    if (!expressReq.get) {
-      expressReq.get = function(name: string) {
+    // Copiar todas as propriedades do req do Vercel
+    const expressReq = {
+      ...req,
+      url: finalUrl,
+      originalUrl: finalUrl,
+      path: finalPath,
+      baseUrl: '',
+      method: req.method || 'GET',
+      query: req.query || {},
+      params: {},
+      body: req.body,
+      headers: req.headers || {},
+      // Métodos do Express
+      get: function(name: string) {
         return this.headers?.[name.toLowerCase()]
-      }
-    }
-    if (!expressReq.header) {
-      expressReq.header = expressReq.get
-    }
+      },
+      header: function(name: string) {
+        return this.headers?.[name.toLowerCase()]
+      },
+      // Propriedades adicionais
+      protocol: 'https',
+      secure: true,
+      hostname: req.headers?.['host'] || 'localhost',
+      ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
+    } as any
     
     // Processar no Express
     return new Promise<void>((resolve) => {
