@@ -15,7 +15,7 @@ const app = express()
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? (process.env.FRONTEND_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : true)
+    ? (process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : true))
     : true, // Permite qualquer origem em desenvolvimento (localhost em qualquer porta)
   credentials: true
 }))
