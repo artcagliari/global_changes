@@ -8,13 +8,6 @@
       "maxDuration": 30
     }
   },
-  "ignore": [
-    "server/node_modules",
-    "server/uploads",
-    "server/prisma/dev.db",
-    "server/prisma/*.db",
-    "server/prisma/migrations.sqlite.backup"
-  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
