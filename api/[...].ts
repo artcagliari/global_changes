@@ -113,11 +113,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Usar req do Vercel diretamente, ajustando apenas as propriedades essenciais
     const expressReq = req as any
     
-    // Ajustar propriedades que o Express precisa
-    // IMPORTANTE: O Express router usa req.path para fazer match
+    // IMPORTANTE: O Express router faz match usando req.url e req.originalUrl
+    // O req.path é derivado pelo Express internamente, não devemos definir manualmente
+    // Para rotas com parâmetros (:id), o Express precisa do path completo no url
     expressReq.url = fullUrl
     expressReq.originalUrl = fullUrl
-    expressReq.path = pathOnly
+    // Não definir path manualmente - deixar o Express calcular
+    delete expressReq.path
     expressReq.baseUrl = ''
     
     // Garantir propriedades essenciais
@@ -127,6 +129,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!expressReq.query) {
       expressReq.query = {}
     }
+    // Não inicializar params - o Express vai preencher automaticamente das rotas
+    // expressReq.params será preenchido pelo Express router quando encontrar a rota
     if (!expressReq.params) {
       expressReq.params = {}
     }
