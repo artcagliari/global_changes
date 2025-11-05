@@ -70,8 +70,31 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Rotas da API
+// IMPORTANTE: A ordem importa - rotas mais específicas primeiro
 app.use('/api/videos', videoRoutes) // Rotas específicas de vídeos
 app.use('/api', apiRoutes) // Rotas de gerenciamento (users, rewards, submissions)
+
+// Debug: listar todas as rotas registradas (apenas no Vercel)
+if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
+  console.log('📋 Rotas registradas:')
+  console.log('   GET  /api/users')
+  console.log('   GET  /api/users/:id')
+  console.log('   POST /api/users')
+  console.log('   PATCH /api/users/:id')
+  console.log('   DELETE /api/users/:id')
+  console.log('   GET  /api/rewards')
+  console.log('   POST /api/rewards')
+  console.log('   PATCH /api/rewards/:id')
+  console.log('   DELETE /api/rewards/:id')
+  console.log('   POST /api/rewards/:id/redeem')
+  console.log('   GET  /api/users/:id/redeemed-rewards')
+  console.log('   GET  /api/submissions')
+  console.log('   POST /api/submissions')
+  console.log('   PATCH /api/submissions/:id/approve')
+  console.log('   PATCH /api/submissions/:id/reject')
+  console.log('   POST /api/videos/upload')
+  console.log('   POST /api/login')
+}
 
 // Health check
 app.get('/health', (_req, res) => res.json({ 

@@ -32,23 +32,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, req.url vem como /api/rewards, /api/users/:id, etc.
-    // Mas precisamos garantir que o path esteja correto
-    const url = req.url || req.query?.path || ''
-    const path = typeof url === 'string' ? url.split('?')[0] : ''
-    
-    // Se a URL não começar com /api, adicionar
+    // No Vercel com api/[...].ts, a URL vem completa como /api/rewards, /api/users/:id, etc.
+    const originalUrl = req.url || ''
+    const path = originalUrl.split('?')[0]
     const finalPath = path.startsWith('/api') ? path : `/api${path || ''}`
-    const queryString = typeof url === 'string' && url.includes('?') ? '?' + url.split('?')[1] : ''
+    const queryString = originalUrl.includes('?') ? '?' + originalUrl.split('?')[1] : ''
     const finalUrl = finalPath + queryString
     
     console.log(`📨 ${req.method} ${finalPath} (original: ${req.url})`)
-    console.log('📋 Query:', req.query)
-    console.log('📋 Body:', req.body ? JSON.stringify(req.body).substring(0, 100) : 'empty')
     
-    // Criar um objeto request que o Express possa processar
-    // Usar req diretamente mas sobrescrever propriedades necessárias
-    const expressReq = Object.assign(req, {
+    // Criar objeto request compatível com Express
+    // O Express precisa que req.url, req.path, req.originalUrl estejam corretos
+    const expressReq = {
+      ...req,
       url: finalUrl,
       originalUrl: finalUrl,
       path: finalPath,
@@ -58,41 +54,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       params: {},
       body: req.body,
       headers: req.headers || {},
-      // Métodos do Express Request
+      // Métodos do Express
       get: function(name: string) {
-        const headers = this.headers || {}
-        return headers[name.toLowerCase()]
+        return this.headers?.[name.toLowerCase()]
       },
       header: function(name: string) {
         return this.get(name)
       },
-      // Propriedades adicionais necessárias
+      // Propriedades adicionais
       protocol: 'https',
       secure: true,
       hostname: req.headers?.['host'] || 'localhost',
       ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
-      // Propriedades do Express
-      route: undefined,
-      res: undefined,
-      next: undefined,
-      // Garantir que seja reconhecido como request válido
-      connection: {},
-      socket: {},
-      httpVersion: '1.1',
-      httpVersionMajor: 1,
-      httpVersionMinor: 1,
-      complete: false,
-      rawHeaders: [],
-      rawTrailers: [],
-      trailers: {},
-      upgrade: false,
-      aborted: false,
-      read: function() {},
-      setEncoding: function() {},
-      pause: function() {},
-      resume: function() {},
-      destroy: function() {},
-    }) as any
+    } as any
+    
+    // Garantir que o Express possa processar o request corretamente
+    // Adicionar propriedades necessárias para o router do Express
+    if (!expressReq.route) {
+      expressReq.route = undefined
+    }
+    if (!expressReq.res) {
+      expressReq.res = res
+    }
     
     // Processar no Express usando callback
     return new Promise<void>((resolve) => {
