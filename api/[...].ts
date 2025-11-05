@@ -126,19 +126,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
         } else {
-          // Se não houve erro mas a resposta ainda não foi enviada, pode ser que o Express não encontrou a rota
+          // Se não houve erro mas a resposta não foi enviada, o Express não encontrou a rota
           if (!res.headersSent) {
-            console.warn('⚠️  Nenhuma rota encontrada para:', finalPath)
+            console.error('❌ Rota não encontrada pelo Express!')
+            console.error(`   Método: ${req.method}`)
+            console.error(`   Path: ${finalPath}`)
+            console.error(`   URL: ${finalUrl}`)
+            console.error(`   Original URL: ${req.url}`)
+            
             setTimeout(() => {
               if (!res.headersSent) {
                 res.status(404).json({
                   error: 'Rota não encontrada',
                   path: finalPath,
-                  method: req.method
+                  method: req.method,
+                  originalUrl: req.url,
+                  hint: 'Verifique se a rota está registrada no Express'
                 })
               }
               finish()
-            }, 100)
+            }, 200)
           } else {
             finish()
           }
