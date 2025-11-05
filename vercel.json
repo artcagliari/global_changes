@@ -2,24 +2,18 @@
   "buildCommand": "npm run build && cd server && npm run prisma:generate",
   "outputDirectory": "dist",
   "installCommand": "npm install && cd server && npm install",
-  "functions": {
-    "server/src/index.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/server/src/index.ts"
+      "destination": "/api/$1"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "/server/src/index.ts"
+      "destination": "/api/uploads/$1"
     },
     {
       "source": "/health",
-      "destination": "/server/src/index.ts"
+      "destination": "/api/health"
     }
   ],
   "env": {
