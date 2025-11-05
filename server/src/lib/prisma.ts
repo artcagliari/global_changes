@@ -1,7 +1,8 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 
 // Verificar se estamos usando Prisma Accelerate (URL começa com prisma+postgres://)
-const isAccelerate = process.env.DATABASE_URL?.startsWith('prisma+postgres://')
+const databaseUrl = process.env.DATABASE_URL || ''
+const isAccelerate = databaseUrl.startsWith('prisma+postgres://') || databaseUrl.includes('accelerate.prisma-data.net')
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
 
 // Singleton pattern para serverless functions (Vercel)
@@ -11,12 +12,19 @@ declare global {
 }
 
 // Verificar se DATABASE_URL está configurado
-if (!process.env.DATABASE_URL) {
+if (!databaseUrl) {
   console.error('❌ DATABASE_URL não está configurado!')
   console.error('Configure no Vercel: Settings → Environment Variables')
   console.error('Valor esperado: postgres://... ou prisma+postgres://...')
 } else {
-  console.log(`✅ DATABASE_URL configurado (${isAccelerate ? 'Accelerate' : 'PostgreSQL direto'})`)
+  const urlPreview = databaseUrl.substring(0, 30) + '...'
+  console.log(`✅ DATABASE_URL configurado`)
+  console.log(`   Tipo: ${isAccelerate ? '🚀 Accelerate' : '📊 PostgreSQL direto'}`)
+  console.log(`   URL preview: ${urlPreview}`)
+  
+  if (!isAccelerate && isVercel) {
+    console.log('💡 Dica: Para usar Accelerate, configure DATABASE_URL começando com prisma+postgres://')
+  }
 }
 
 // Configuração otimizada para serverless
@@ -35,10 +43,20 @@ if (isAccelerate) {
     // Carregar a extensão do Accelerate
     const { withAccelerate } = require('@prisma/extension-accelerate')
     prismaBase = prismaBase.$extends(withAccelerate())
-    console.log('🚀 Prisma Accelerate ativado (cache e otimizações)')
+    console.log('🚀 Prisma Accelerate ATIVADO!')
+    console.log('   ✅ Cache automático habilitado')
+    console.log('   ✅ Conexões otimizadas para serverless')
+    console.log('   ✅ Performance melhorada')
   } catch (error: any) {
-    console.warn('⚠️  Não foi possível carregar Prisma Accelerate:', error.message)
+    console.error('❌ Erro ao carregar Prisma Accelerate:', error.message)
+    console.error('   Stack:', error.stack)
     console.warn('   Continuando sem Accelerate (usando PostgreSQL direto)')
+    console.warn('   Verifique se @prisma/extension-accelerate está instalado')
+  }
+} else {
+  if (isVercel) {
+    console.log('ℹ️  Accelerate não detectado - usando PostgreSQL direto')
+    console.log('   Para ativar: configure DATABASE_URL com prisma+postgres://...')
   }
 }
 
