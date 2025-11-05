@@ -36,16 +36,25 @@ const Upload = () => {
       formData.append('video', file)
       formData.append('userId', currentUser.id)
 
+      console.log('📤 Enviando vídeo para:', `${API_URL}/api/videos/upload`)
+      console.log('   Arquivo:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`)
+      
       const response = await fetch(`${API_URL}/api/videos/upload`, {
         method: 'POST',
         body: formData,
+        // Não adicionar Content-Type - o browser define automaticamente com boundary para multipart
       })
 
+      console.log('📥 Resposta do servidor:', response.status, response.statusText)
+
       if (!response.ok) {
-        throw new Error('Falha no upload do vídeo')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Erro no upload:', errorData)
+        throw new Error(errorData.message || `Erro ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
+      console.log('✅ Upload bem-sucedido:', data)
 
       // O backend já salvou no banco, não precisamos duplicar
       setMessage('Vídeo enviado com sucesso! Aguardando aprovação.')
@@ -55,7 +64,9 @@ const Upload = () => {
         navigate('/dashboard')
       }, 1500)
     } catch (err) {
-      setMessage('Erro ao enviar o vídeo. Tente novamente.')
+      console.error('❌ Erro no upload:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao enviar o vídeo. Tente novamente.'
+      setMessage(errorMessage)
     } finally {
       setIsUploading(false)
     }

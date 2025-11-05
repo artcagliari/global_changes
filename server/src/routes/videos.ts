@@ -52,14 +52,33 @@ if (isVercel) {
 
 router.post('/upload', upload.single('video'), async (req, res) => {
   try {
+    console.log('📹 Upload de vídeo recebido')
+    console.log('   Método:', req.method)
+    console.log('   Path:', req.path)
+    console.log('   Content-Type:', req.headers['content-type'])
+    console.log('   Body:', req.body)
+    console.log('   File:', req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      buffer: req.file.buffer ? `${req.file.buffer.length} bytes` : 'no buffer'
+    } : 'no file')
+    
     if (!req.file) {
+      console.error('❌ Nenhum arquivo recebido')
       return res.status(400).json({ message: 'Nenhum arquivo de vídeo enviado.' })
     }
 
     const { userId } = req.body
     if (!userId) {
+      console.error('❌ userId não fornecido')
       return res.status(400).json({ message: 'ID do usuário é obrigatório.' })
     }
+    
+    console.log('✅ Arquivo recebido:', req.file.originalname)
+    console.log('   Tamanho:', req.file.size, 'bytes')
+    console.log('   UserId:', userId)
 
     // Verificar se o usuário existe
     const user = await prisma.user.findUnique({
@@ -88,6 +107,14 @@ router.post('/upload', upload.single('video'), async (req, res) => {
       videoUrl = req.file.filename
     }
 
+    // Garantir conexão com o banco
+    const { ensureConnection } = await import('../lib/prisma.js')
+    const connected = await ensureConnection()
+    if (!connected) {
+      console.error('❌ Não foi possível conectar ao banco de dados')
+      return res.status(500).json({ message: 'Erro ao conectar ao banco de dados' })
+    }
+    
     // Criar submissão no banco com o userId correto
     const submission = await prisma.submission.create({
       data: {
@@ -96,15 +123,22 @@ router.post('/upload', upload.single('video'), async (req, res) => {
         status: 'pending'
       }
     })
+    
+    console.log('✅ Submissão criada:', submission.id)
 
     res.status(200).json({ 
       message: 'Vídeo enviado com sucesso!', 
       fileName: videoUrl,
       submissionId: submission.id
     })
-  } catch (error) {
-    console.error('Erro no upload:', error)
-    res.status(500).json({ message: 'Erro interno do servidor' })
+  } catch (error: any) {
+    console.error('❌ Erro no upload:', error)
+    console.error('   Mensagem:', error.message)
+    console.error('   Stack:', error.stack)
+    res.status(500).json({ 
+      message: 'Erro interno do servidor',
+      error: error.message 
+    })
   }
 })
 
