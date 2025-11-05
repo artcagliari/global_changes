@@ -14,8 +14,11 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
     
+    console.log('🔐 Tentativa de login:', { email, password: '***' })
+    
     // Simulação de senha (em produção, usar hash)
     if (password !== '123') {
+      console.log('❌ Senha incorreta')
       return res.status(401).json({ error: 'Credenciais inválidas' })
     }
     
@@ -24,12 +27,16 @@ router.post('/login', async (req, res) => {
     })
     
     if (!user) {
+      console.log('❌ Usuário não encontrado:', email)
       return res.status(401).json({ error: 'Credenciais inválidas' })
     }
     
+    console.log('✅ Login bem-sucedido:', user.email)
     res.json(user)
-  } catch (error) {
-    res.status(500).json({ error: 'Erro no login' })
+  } catch (error: any) {
+    console.error('❌ Erro no login:', error.message)
+    console.error(error.stack)
+    res.status(500).json({ error: 'Erro no login', message: error.message })
   }
 })
 
