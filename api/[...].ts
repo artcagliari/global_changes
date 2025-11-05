@@ -114,13 +114,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const expressReq = req as any
     
     // IMPORTANTE: O Express router faz match usando req.url e req.originalUrl
-    // O req.path é derivado pelo Express internamente, não devemos definir manualmente
-    // Para rotas com parâmetros (:id), o Express precisa do path completo no url
+    // Para rotas com parâmetros (:id), precisamos garantir que o path esteja correto
+    // O Express calcula req.path internamente, mas podemos ajudar definindo explicitamente
     expressReq.url = fullUrl
     expressReq.originalUrl = fullUrl
-    // Não definir path manualmente - deixar o Express calcular
-    delete expressReq.path
+    // Definir path explicitamente para garantir match correto
+    expressReq.path = pathOnly
     expressReq.baseUrl = ''
+    
+    console.log('🔧 Express Request configurado:')
+    console.log(`   url: ${expressReq.url}`)
+    console.log(`   originalUrl: ${expressReq.originalUrl}`)
+    console.log(`   path: ${expressReq.path}`)
+    console.log(`   method: ${expressReq.method}`)
     
     // Garantir propriedades essenciais
     if (!expressReq.method) {
