@@ -1,0 +1,12 @@
+# Ignorar arquivos grandes e desnecessários no deploy do Vercel
+server/node_modules/
+server/uploads/
+server/prisma/dev.db
+server/prisma/*.db
+server/prisma/*.db-journal
+server/prisma/migrations.sqlite.backup/
+server/test-login.ts
+server/prisma/migrate-data.ts
+*.md
+!README.md
+
