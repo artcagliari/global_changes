@@ -1,10 +1,33 @@
 // Vercel Serverless Function - Catch-all route
-// Este arquivo captura todas as rotas da API e repassa para o servidor Express
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 // Importar o app Express
-import app from '../server/src/index'
+let app: any = null
 
-// Exportar o app Express diretamente
-// O Vercel automaticamente converte o Express app para serverless function
-export default app
+async function handler(req: VercelRequest, res: VercelResponse) {
+  // Lazy load para evitar problemas de inicialização
+  if (!app) {
+    try {
+      // Tentar importar do build primeiro, depois do source
+      try {
+        const serverModule = await import('../server/dist/index.js')
+        app = serverModule.default
+      } catch {
+        const serverModule = await import('../server/src/index')
+        app = serverModule.default
+      }
+    } catch (error: any) {
+      console.error('Erro ao importar servidor:', error)
+      return res.status(500).json({ 
+        error: 'Erro ao carregar servidor',
+        message: error.message 
+      })
+    }
+  }
+  
+  // Repassar requisição para Express
+  return app(req as any, res as any)
+}
+
+export default handler
 
