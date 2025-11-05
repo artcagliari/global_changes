@@ -15,28 +15,42 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body
     
     console.log('🔐 Tentativa de login:', { email, password: '***' })
-    console.log('🔍 DATABASE_URL configurado:', !!process.env.DATABASE_URL)
+    
+    // Verificar se DATABASE_URL está configurado
+    if (!process.env.DATABASE_URL) {
+      console.error('❌ DATABASE_URL não configurado')
+      return res.status(500).json({ 
+        error: 'Banco de dados não configurado',
+        message: 'DATABASE_URL não está definido. Configure no Vercel: Settings → Environment Variables'
+      })
+    }
+    
+    console.log('🔍 DATABASE_URL configurado:', process.env.DATABASE_URL.substring(0, 20) + '...')
     
     // Verificar se Prisma está conectado
     try {
       await prisma.$connect()
-      console.log('✅ Prisma conectado')
+      console.log('✅ Prisma conectado ao banco')
     } catch (prismaError: any) {
       console.error('❌ Erro ao conectar Prisma:', prismaError.message)
+      console.error('Código:', prismaError.code)
       return res.status(500).json({ 
         error: 'Erro de conexão com banco de dados',
-        message: prismaError.message 
+        message: prismaError.message,
+        code: prismaError.code,
+        hint: 'Verifique se DATABASE_URL está correto no Vercel'
       })
     }
     
     // Simulação de senha (em produção, usar hash)
     if (password !== '123') {
-      console.log('❌ Senha incorreta')
+      console.log('❌ Senha incorreta para:', email)
       return res.status(401).json({ error: 'Credenciais inválidas' })
     }
     
+    console.log('🔍 Buscando usuário:', email)
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email: email.toLowerCase().trim() }
     })
     
     if (!user) {
@@ -44,14 +58,24 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' })
     }
     
-    console.log('✅ Login bem-sucedido:', user.email)
+    console.log('✅ Login bem-sucedido:', user.email, user.name)
     res.json(user)
   } catch (error: any) {
     console.error('❌ Erro no login:', error.message)
     console.error('Stack:', error.stack)
     console.error('Código:', error.code)
+    console.error('Nome:', error.name)
+    
+    // Mensagem mais clara para o usuário
+    let userMessage = 'Erro ao fazer login'
+    if (error.code === 'P1001') {
+      userMessage = 'Não foi possível conectar ao banco de dados. Verifique se DATABASE_URL está configurado no Vercel.'
+    } else if (error.code === 'P1000') {
+      userMessage = 'Falha na autenticação do banco de dados. Verifique as credenciais.'
+    }
+    
     res.status(500).json({ 
-      error: 'Erro no login', 
+      error: userMessage,
       message: error.message,
       code: error.code 
     })
