@@ -75,6 +75,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`📨 ${req.method} ${pathOnly}`)
     console.log(`   URL final: ${fullUrl}`)
     
+    // IMPORTANTE: Para uploads multipart/form-data, não processar o body aqui
+    // O Multer precisa processar o body raw antes do Express
+    const isMultipart = req.headers['content-type']?.includes('multipart/form-data')
+    
     // Criar um objeto request que o Express possa processar
     // O Express precisa que o request tenha propriedades específicas
     const expressReq = {
@@ -86,7 +90,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: req.method || 'GET',
       query: req.query || {},
       params: {},
-      body: req.body,
+      // Para multipart, não passar body parseado - deixar o Multer processar
+      body: isMultipart ? undefined : req.body,
       headers: req.headers || {},
       // Métodos do Express Request
       get: function(name: string) {
@@ -223,9 +228,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!res.headersSent) {
       try {
         res.status(500).json({
-          error: 'Erro ao processar requisição',
-          message: error.message
-        })
+      error: 'Erro ao processar requisição',
+      message: error.message
+    })
       } catch (sendError) {
         console.error('Erro ao enviar resposta:', sendError)
       }
