@@ -193,8 +193,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return result
       }
       
-      // Usar handle do Express
-      expressApp.handle(expressReq, res, (err?: any) => {
+      // Usar o app Express diretamente (como função) ou handle
+      // Tentar ambas as formas para garantir compatibilidade
+      const expressHandler = expressApp.handle || expressApp
+      
+      expressHandler.call(expressApp, expressReq, res, (err?: any) => {
         if (err) {
           console.error('❌ Erro no Express:', err.message)
           console.error('Stack:', err.stack)
@@ -212,13 +215,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
           // Se não houve erro mas resposta não foi enviada, rota não encontrada
           if (!res.headersSent) {
-            console.error('❌ Rota não encontrada!')
+            console.error('❌ Rota não encontrada pelo Express!')
             console.error(`   Método: ${req.method}`)
             console.error(`   Path esperado: ${pathOnly}`)
             console.error(`   expressReq.path: ${expressReq.path}`)
             console.error(`   expressReq.url: ${expressReq.url}`)
             console.error(`   expressReq.originalUrl: ${expressReq.originalUrl}`)
             console.error(`   req.url original: ${req.url}`)
+            
+            // Verificar se é uma rota que deveria existir
+            const knownRoutes = [
+              '/api/login',
+              '/api/users',
+              '/api/users/:id',
+              '/api/videos/upload',
+              '/api/rewards',
+              '/api/submissions'
+            ]
+            const isKnownRoute = knownRoutes.some(route => {
+              const routePattern = route.replace(':id', '[^/]+')
+              const regex = new RegExp(`^${routePattern}$`)
+              return regex.test(pathOnly)
+            })
+            
+            if (isKnownRoute) {
+              console.error('⚠️  Esta rota DEVERIA existir! Problema no roteamento do Express.')
+            }
             
             res.status(404).json({
               error: 'Rota não encontrada',
@@ -228,7 +250,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 reqUrl: req.url,
                 expressReqPath: expressReq.path,
                 expressReqUrl: expressReq.url,
-                expressReqOriginalUrl: expressReq.originalUrl
+                expressReqOriginalUrl: expressReq.originalUrl,
+                isKnownRoute: isKnownRoute
               }
             })
           }
