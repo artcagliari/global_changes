@@ -34,41 +34,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, a URL vem como /api/login, /api/users/:id, /api/videos/upload, etc.
-    // Precisamos garantir que o path seja extraído corretamente
-    // A URL pode vir como /api/videos/upload ou /videos/upload dependendo da configuração
+    // No Vercel com api/[...].ts, a URL vem como /api/login, /api/users/:id, etc.
+    // A URL já vem correta do Vercel, não precisamos modificar
     let url = req.url || ''
-    let path = url.split('?')[0]
+    const path = url.split('?')[0]
     
-    // Garantir que a URL sempre comece com /api se não começar
-    // No Vercel, com api/[...].ts, a URL já vem como /api/...
-    if (!path.startsWith('/api')) {
-      path = `/api${path}`
-      url = path + (url.includes('?') ? '?' + url.split('?')[1] : '')
+    // Garantir que a URL sempre comece com /api (segurança)
+    const finalPath = path.startsWith('/api') ? path : `/api${path}`
+    const finalUrl = finalPath + (url.includes('?') ? '?' + url.split('?')[1] : '')
+    
+    console.log(`📨 ${req.method} ${finalPath}`)
+    
+    // Parse do body se necessário (Vercel já parseia JSON, mas garantimos)
+    let body = req.body
+    if (!body && req.method && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      const contentType = req.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        try {
+          // Se o body é uma string, tentar parsear
+          if (typeof req.body === 'string') {
+            body = JSON.parse(req.body)
+          }
+        } catch (e) {
+          console.warn('⚠️  Erro ao parsear body JSON:', e)
+        }
+      }
     }
     
-    console.log(`📨 ${req.method} ${path}${url.includes('?') ? '?' + url.split('?')[1] : ''}`)
-    
     // Criar um objeto de request compatível com Express
-    // Importante: Express precisa de url, path, originalUrl para funcionar corretamente
-    // O path deve ser o caminho completo incluindo /api
     const expressReq = {
       ...req,
-      url: url,
-      originalUrl: url,
-      path: path,
+      url: finalUrl,
+      originalUrl: finalUrl,
+      path: finalPath,
       baseUrl: '',
       method: req.method || 'GET',
       headers: req.headers || {},
-      body: req.body,
+      body: body || req.body,
       query: req.query || {},
       params: {},
-      // Adicionar propriedades necessárias para o Express
+      // Propriedades necessárias para o Express
       protocol: 'https',
       secure: true,
       hostname: req.headers?.['host'] || 'localhost',
       ip: req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || '0.0.0.0',
-      // Adicionar métodos do Express
+      // Métodos do Express
       get: (name: string) => req.headers?.[name.toLowerCase()],
       header: (name: string) => req.headers?.[name.toLowerCase()],
     } as any

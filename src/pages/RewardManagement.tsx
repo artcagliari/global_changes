@@ -35,29 +35,48 @@ const RewardManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validação básica
+    if (!formData.name.trim()) {
+      alert('Nome da recompensa é obrigatório')
+      return
+    }
+    
+    if (formData.pointCost < 0) {
+      alert('Custo em pontos deve ser positivo')
+      return
+    }
+    
     try {
-      if (editingReward) {
-        // Atualizar recompensa
-        await fetch(`${API_URL}/api/rewards/${editingReward.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        })
-      } else {
-        // Criar recompensa
-        await fetch(`${API_URL}/api/rewards`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        })
+      const url = editingReward 
+        ? `${API_URL}/api/rewards/${editingReward.id}`
+        : `${API_URL}/api/rewards`
+      
+      const method = editingReward ? 'PATCH' : 'POST'
+      
+      console.log(`📝 ${method} ${url}`, formData)
+      
+      const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`)
       }
+
+      const data = await response.json()
+      console.log('✅ Recompensa salva:', data)
       
       setShowForm(false)
       setEditingReward(null)
       setFormData({ name: '', pointCost: 0 })
       fetchRewards()
     } catch (error) {
-      console.error('Erro ao salvar recompensa:', error)
+      console.error('❌ Erro ao salvar recompensa:', error)
+      alert(error instanceof Error ? error.message : 'Erro ao salvar recompensa')
     }
   }
 

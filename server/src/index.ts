@@ -28,16 +28,9 @@ if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
   })
 }
 
-// Parse JSON apenas para rotas que não são uploads
-// Multer precisa processar multipart/form-data antes do body ser parseado
-app.use((req, res, next) => {
-  // Não parsear JSON se for upload de vídeo (multer vai processar)
-  if (req.path.includes('/videos/upload') && req.method === 'POST') {
-    return next()
-  }
-  express.json({ limit: '50mb' })(req, res, next)
-})
-
+// Parse JSON e URL-encoded para todas as rotas
+// O multer vai sobrescrever o body parsing para rotas de upload
+app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 if (process.env.NODE_ENV !== 'production') {

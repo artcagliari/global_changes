@@ -204,8 +204,15 @@ router.delete('/users/:id', async (req, res) => {
   try {
     const { id } = req.params
     
+    console.log('🗑️  Deletando usuário:', id)
+    
     // Deletar submissões primeiro (cascade)
     await prisma.submission.deleteMany({
+      where: { userId: id }
+    })
+    
+    // Deletar redemptions também
+    await prisma.rewardRedemption.deleteMany({
       where: { userId: id }
     })
     
@@ -213,9 +220,17 @@ router.delete('/users/:id', async (req, res) => {
       where: { id }
     })
 
+    console.log('✅ Usuário deletado:', id)
     res.json({ success: true })
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete user' })
+  } catch (error: any) {
+    console.error('❌ Erro ao deletar usuário:', error)
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Usuário não encontrado' })
+    }
+    res.status(500).json({ 
+      error: 'Erro ao deletar usuário',
+      message: error.message 
+    })
   }
 })
 
@@ -236,13 +251,29 @@ router.post('/rewards', async (req, res) => {
   try {
     const { name, pointCost } = req.body
     
+    // Validações
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Nome da recompensa é obrigatório' })
+    }
+    
+    if (pointCost === undefined || pointCost === null || pointCost < 0) {
+      return res.status(400).json({ error: 'Custo em pontos deve ser um número positivo' })
+    }
+    
+    console.log('📝 Criando recompensa:', { name, pointCost })
+    
     const reward = await prisma.reward.create({
-      data: { name, pointCost }
+      data: { name: name.trim(), pointCost: Number(pointCost) }
     })
 
+    console.log('✅ Recompensa criada:', reward.id)
     res.json(reward)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create reward' })
+  } catch (error: any) {
+    console.error('❌ Erro ao criar recompensa:', error)
+    res.status(500).json({ 
+      error: 'Erro ao criar recompensa',
+      message: error.message 
+    })
   }
 })
 
@@ -252,17 +283,38 @@ router.patch('/rewards/:id', async (req, res) => {
     const { id } = req.params
     const { name, pointCost } = req.body
     
+    console.log('📝 Atualizando recompensa:', { id, name, pointCost })
+    
+    const updateData: any = {}
+    if (name !== undefined) {
+      if (!name.trim()) {
+        return res.status(400).json({ error: 'Nome da recompensa não pode ser vazio' })
+      }
+      updateData.name = name.trim()
+    }
+    if (pointCost !== undefined) {
+      if (pointCost < 0) {
+        return res.status(400).json({ error: 'Custo em pontos deve ser um número positivo' })
+      }
+      updateData.pointCost = Number(pointCost)
+    }
+    
     const reward = await prisma.reward.update({
       where: { id },
-      data: {
-        ...(name && { name }),
-        ...(pointCost !== undefined && { pointCost })
-      }
+      data: updateData
     })
 
+    console.log('✅ Recompensa atualizada:', reward.id)
     res.json(reward)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update reward' })
+  } catch (error: any) {
+    console.error('❌ Erro ao atualizar recompensa:', error)
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Recompensa não encontrada' })
+    }
+    res.status(500).json({ 
+      error: 'Erro ao atualizar recompensa',
+      message: error.message 
+    })
   }
 })
 
