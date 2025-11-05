@@ -1,13 +1,13 @@
-// Vercel Serverless Function - Catch-all route
+// Vercel Serverless Function - Catch-all route para Express
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-// Importar o app Express diretamente
+// Cache do app Express
 let app: any = null
 
 async function getApp() {
   if (!app) {
     try {
-      console.log('📦 Carregando servidor Express...')
+      console.log('📦 Inicializando servidor Express...')
       
       if (!process.env.DATABASE_URL) {
         console.error('❌ DATABASE_URL não configurado!')
@@ -15,9 +15,11 @@ async function getApp() {
         console.log('✅ DATABASE_URL configurado')
       }
       
+      // Importar o app Express
       const serverModule = await import('../server/src/index.js')
       app = serverModule.default
-      console.log('✅ Servidor Express carregado')
+      
+      console.log('✅ Servidor Express carregado com sucesso')
     } catch (error: any) {
       console.error('❌ Erro ao carregar servidor:', error.message)
       console.error('Stack:', error.stack)
@@ -27,21 +29,20 @@ async function getApp() {
   return app
 }
 
-// Exportar como handler do Vercel
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // No Vercel com api/[...].ts, req.url já vem com o path completo
-    // Exemplo: /api/users/123 -> req.url = '/api/users/123'
-    // Ou pode vir como /users/123 quando o rewrite remove /api
-    let url = req.url || ''
+    // No Vercel com api/[...].ts, o path vem completo em req.url
+    // Exemplo: requisição para /api/users/123 resulta em req.url = '/users/123' ou '/api/users/123'
+    // Dependendo da configuração do vercel.json
     
-    // Se não tiver URL, tentar construir a partir do query
-    // Quando usa [...], os segmentos podem vir em req.query
-    if (!url || url === '/') {
+    let path = req.url || ''
+    
+    // Se a URL estiver vazia ou for apenas '/', tentar construir a partir do query
+    // Quando usa [...], os segmentos podem vir em req.query como '0', '1', etc.
+    if (!path || path === '/') {
       if (req.query && Object.keys(req.query).length > 0) {
-        // Os segmentos vêm como '0', '1', '2', etc.
         const segments: string[] = []
         let i = 0
         while (req.query[String(i)]) {
@@ -49,64 +50,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           i++
         }
         if (segments.length > 0) {
-          url = '/' + segments.join('/')
+          path = '/' + segments.join('/')
         }
       }
     }
     
-    // Garantir que comece com /api
-    if (!url.startsWith('/api')) {
-      url = '/api' + (url.startsWith('/') ? url : '/' + url)
+    // Garantir que o path comece com /api
+    // Se o rewrite no vercel.json já adicionou /api, não adicionar novamente
+    if (!path.startsWith('/api')) {
+      path = '/api' + (path.startsWith('/') ? path : '/' + path)
     }
     
-    // Separar path e query string
-    const [path, queryString] = url.split('?')
-    const finalUrl = path + (queryString ? '?' + queryString : '')
+    // Separar query string do path
+    const [pathOnly, queryString] = path.split('?')
+    const fullUrl = pathOnly + (queryString ? '?' + queryString : '')
     
-    console.log(`📨 ${req.method} ${path}`)
-    console.log(`   URL original: ${req.url}`)
-    console.log(`   URL final: ${finalUrl}`)
+    console.log(`📨 ${req.method} ${pathOnly}`)
+    console.log(`   req.url original: ${req.url}`)
+    console.log(`   path final: ${pathOnly}`)
     
-    // Usar o req do Vercel diretamente, apenas ajustando propriedades essenciais
-    // O Express precisa que url, originalUrl, path estejam corretos
+    // Criar um objeto request compatível com Express
+    // Modificar o req diretamente (não criar novo objeto)
     const expressReq = req as any
     
-    // Ajustar propriedades que o Express precisa
-    expressReq.url = finalUrl
-    expressReq.originalUrl = finalUrl
-    expressReq.path = finalPath
+    // Ajustar propriedades essenciais que o Express precisa
+    expressReq.url = fullUrl
+    expressReq.originalUrl = fullUrl
+    expressReq.path = pathOnly
     expressReq.baseUrl = ''
     
-    // Garantir que method esteja presente
+    // Garantir que propriedades essenciais existam
     if (!expressReq.method) {
       expressReq.method = req.method || 'GET'
     }
-    
-    // Garantir que query esteja presente
     if (!expressReq.query) {
       expressReq.query = {}
     }
-    
-    // Garantir que params esteja presente (será preenchido pelo Express router)
     if (!expressReq.params) {
       expressReq.params = {}
     }
     
-    // Métodos do Express Request
-    if (!expressReq.get) {
+    // Adicionar métodos do Express Request se não existirem
+    if (typeof expressReq.get !== 'function') {
       expressReq.get = function(name: string) {
         const headers = this.headers || {}
         return headers[name.toLowerCase()]
       }
     }
     
-    if (!expressReq.header) {
+    if (typeof expressReq.header !== 'function') {
       expressReq.header = function(name: string) {
         return this.get(name)
       }
     }
     
-    // Processar no Express usando callback
+    // Processar a requisição no Express
     return new Promise<void>((resolve) => {
       let finished = false
       
@@ -117,66 +115,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       
-      // Interceptar métodos de resposta para saber quando terminar
+      // Interceptar métodos de resposta para detectar quando terminar
       const originalEnd = res.end.bind(res)
-      res.end = function(chunk?: any, encoding?: any, cb?: any) {
-        const result = originalEnd(chunk, encoding, cb)
-        setTimeout(finish, 50) // Dar tempo para o Express processar
+      res.end = function(...args: any[]) {
+        const result = originalEnd(...args)
+        finish()
         return result
       }
       
       const originalJson = res.json.bind(res)
       res.json = function(body?: any) {
         const result = originalJson(body)
-        setTimeout(finish, 50)
+        finish()
         return result
       }
       
       const originalSend = res.send.bind(res)
       res.send = function(body?: any) {
         const result = originalSend(body)
-        setTimeout(finish, 50)
+        finish()
         return result
       }
       
-      // Processar com Express - o callback é chamado quando termina
+      // Processar com Express
+      // O callback é chamado quando o Express termina de processar (ou quando não encontra rota)
       expressApp(expressReq, res, (err?: any) => {
         if (err) {
-          console.error('❌ Erro no Express middleware:', err)
-          console.error('Stack:', err?.stack)
+          console.error('❌ Erro no Express:', err)
           if (!res.headersSent) {
             try {
               res.status(500).json({
                 error: 'Erro interno do servidor',
-                message: err?.message || 'Erro desconhecido'
+                message: err.message
               })
             } catch (sendError) {
               console.error('Erro ao enviar resposta de erro:', sendError)
             }
           }
+          finish()
         } else {
           // Se não houve erro mas a resposta não foi enviada, o Express não encontrou a rota
           if (!res.headersSent) {
-            console.error('❌ Rota não encontrada!')
+            console.error('❌ Rota não encontrada pelo Express!')
             console.error(`   Método: ${req.method}`)
-            console.error(`   Path: ${path}`)
-            console.error(`   URL: ${finalUrl}`)
+            console.error(`   Path: ${pathOnly}`)
+            console.error(`   URL: ${fullUrl}`)
             console.error(`   req.url original: ${req.url}`)
             console.error(`   req.query:`, req.query)
             
             res.status(404).json({
               error: 'Rota não encontrada',
-              path: path,
+              path: pathOnly,
               method: req.method,
               originalUrl: req.url
             })
-          } else {
-            finish()
           }
+          finish()
         }
       })
       
-      // Timeout de segurança
+      // Timeout de segurança (30 segundos)
       setTimeout(() => {
         if (!finished) {
           console.warn('⚠️  Timeout após 30s')
@@ -188,12 +186,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }, 30000)
     })
   } catch (error: any) {
-    console.error('❌ Erro no handler:', error.message)
+    console.error('❌ Erro no handler do Vercel:', error.message)
     console.error('Stack:', error.stack)
     
     if (!res.headersSent) {
       try {
-        return res.status(500).json({
+        res.status(500).json({
           error: 'Erro ao processar requisição',
           message: error.message
         })
@@ -203,4 +201,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 }
-
