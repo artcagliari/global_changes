@@ -42,8 +42,9 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Rotas da API
-app.use('/api/videos', videoRoutes) // Rotas específicas de vídeos
-app.use('/api', apiRoutes) // Rotas de gerenciamento (users, rewards, submissions)
+// No Vercel, as rotas já vêm com /api prefixado
+app.use('/videos', videoRoutes) // Rotas específicas de vídeos
+app.use('/', apiRoutes) // Rotas de gerenciamento (users, rewards, submissions)
 
 // Health check
 app.get('/health', (_req, res) => res.json({ 

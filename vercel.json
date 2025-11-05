@@ -1,10 +1,10 @@
 {
-  "buildCommand": "npm run build && cd server && npm run build && npm run prisma:generate && cd ..",
+  "buildCommand": "npm run build && cd server && npm run prisma:generate && cd ..",
   "outputDirectory": "dist",
   "installCommand": "npm install && cd server && npm install && cd ..",
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "server/dist/**"
+      "includeFiles": "server/**"
     }
   },
   "rewrites": [
