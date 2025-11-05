@@ -23,7 +23,12 @@ app.use(cors({
 // Middleware de debug para verificar rotas no Vercel
 if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
   app.use((req, res, next) => {
-    console.log(`🔍 Express: ${req.method} ${req.path} (originalUrl: ${req.originalUrl}, url: ${req.url})`)
+    console.log(`🔍 Express: ${req.method} ${req.path}`)
+    console.log(`   originalUrl: ${req.originalUrl}`)
+    console.log(`   url: ${req.url}`)
+    console.log(`   baseUrl: ${req.baseUrl}`)
+    console.log(`   query:`, req.query)
+    console.log(`   body:`, req.body ? JSON.stringify(req.body).substring(0, 200) : 'empty')
     next()
   })
 }
