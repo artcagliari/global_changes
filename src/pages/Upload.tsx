@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/useAuthStore'
 import { API_URL } from '../config.ts'
+import { upload } from '@vercel/blob/client'
 
 const Upload = () => {
   const [file, setFile] = useState<File | null>(null)
@@ -40,8 +41,6 @@ const Upload = () => {
       if (isProduction) {
         // Upload usando SDK do Vercel Blob com handleUploadUrl
         console.log('📤 Fazendo upload direto para Vercel Blob...')
-        
-        const { upload } = await import('@vercel/blob')
         
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
         const ext = file.name.includes('.') ? file.name.split('.').pop() : 'mp4'
