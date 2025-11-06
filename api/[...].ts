@@ -72,13 +72,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'https',
       secure: true,
       hostname: (typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '') || '',
-      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || '',
-      body: req.body // Passar body parseado pelo Vercel
+      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || ''
     })
     
     // Para multipart, remover body para o Multer processar o stream raw
-    if (req.headers['content-type']?.includes('multipart/form-data')) {
+    // Para JSON, passar o body parseado pelo Vercel
+    const contentType = typeof req.headers['content-type'] === 'string' ? req.headers['content-type'] : ''
+    if (contentType.includes('multipart/form-data')) {
       delete expressReq.body
+    } else if (req.body && contentType.includes('application/json')) {
+      expressReq.body = req.body
     }
     
     // Processar no Express
@@ -115,8 +118,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       expressApp(expressReq, res as any, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
+          console.error('Stack:', err.stack)
           if (!res.headersSent) {
-            res.status(500).json({ error: 'Erro interno do servidor' })
+            res.status(500).json({ 
+              error: 'Erro interno do servidor',
+              message: err.message 
+            })
           }
           finish()
         } else if (!res.headersSent) {

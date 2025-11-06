@@ -12,9 +12,16 @@ const router = Router()
 // Login
 router.post('/login', async (req, res) => {
   try {
+    // Debug: verificar se body está presente
+    if (!req.body) {
+      console.error('❌ req.body está vazio ou undefined')
+      return res.status(400).json({ error: 'Dados de login não recebidos' })
+    }
+    
     const { email, password } = req.body
     
     if (!email || !password) {
+      console.error('❌ Email ou senha faltando:', { email: !!email, password: !!password })
       return res.status(400).json({ error: 'Email e senha são obrigatórios' })
     }
     
