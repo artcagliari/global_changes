@@ -10,12 +10,11 @@ async function getApp() {
       try {
         serverModule = await import('../server/src/index.js')
       } catch (error1: any) {
-        // Tentar importar da build (pode não existir em dev)
         try {
           // @ts-ignore - dist pode não existir em dev
           serverModule = await import('../server/dist/index.js')
         } catch (error2: any) {
-          throw error1 // Lançar erro original
+          throw error1
         }
       }
       app = serverModule.default
@@ -34,29 +33,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // Construir path
+    // Construir path corretamente
+    // No Vercel, req.url já vem com o path completo incluindo /api
     let path = req.url || '/'
+    
+    // Se não começar com /api, adicionar
     if (!path.startsWith('/api')) {
       path = '/api' + (path.startsWith('/') ? path : '/' + path)
     }
     
+    const pathOnly = path.split('?')[0]
+    
     // Criar request compatível com Express
-    const expressReq = {
-      ...req,
+    // O Express precisa que o request tenha as propriedades corretas
+    const expressReq = Object.create(Object.getPrototypeOf(req))
+    Object.assign(expressReq, req, {
       method: (req.method || 'GET').toUpperCase(),
       url: path,
       originalUrl: path,
-      path: path.split('?')[0],
+      path: pathOnly,
       baseUrl: '',
       query: req.query || {},
       params: {},
       get: (name: string) => req.headers?.[name.toLowerCase()],
       header: (name: string) => req.headers?.[name.toLowerCase()]
-    } as any
+    })
     
-    // Remover body para multipart (Multer vai processar)
+    // Para multipart, garantir que o body não esteja parseado
+    // O Multer precisa processar o stream original
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
+      // Garantir que o request seja tratado como stream
+      expressReq.readable = true
     }
     
     // Processar no Express
@@ -89,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return originalSend(body)
       }
       
-      // Chamar Express
+      // Chamar Express diretamente
       expressApp(expressReq, res, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
@@ -97,7 +105,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.status(500).json({ error: 'Erro interno do servidor' })
           }
         } else if (!res.headersSent) {
-          res.status(404).json({ error: 'Rota não encontrada' })
+          // Se não houve erro mas resposta não foi enviada, rota não encontrada
+          console.error('Rota não encontrada:', req.method, pathOnly)
+          res.status(404).json({ 
+            error: 'Rota não encontrada',
+            method: req.method,
+            path: pathOnly
+          })
         }
         finish()
       })
