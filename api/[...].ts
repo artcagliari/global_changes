@@ -1,5 +1,6 @@
 // Vercel Serverless Function - Catch-all route para Express
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { IncomingMessage, ServerResponse } from 'http'
 
 let app: any = null
 
@@ -11,7 +12,7 @@ async function getApp() {
         serverModule = await import('../server/src/index.js')
       } catch (error1: any) {
         try {
-          // @ts-ignore - dist pode não existir em dev
+          // @ts-ignore
           serverModule = await import('../server/dist/index.js')
         } catch (error2: any) {
           throw error1
@@ -33,39 +34,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // Construir path corretamente
-    // No Vercel, req.url já vem com o path completo incluindo /api
+    // Construir path - no Vercel com catch-all, o path vem em req.query
     let path = req.url || '/'
     
-    // Se não começar com /api, adicionar
+    // Se req.url não tiver path, construir do query (catch-all)
+    if (!path || path === '/') {
+      const segments: string[] = []
+      if (req.query) {
+        let i = 0
+        while (req.query[String(i)] !== undefined) {
+          segments.push(String(req.query[String(i)]))
+          i++
+        }
+      }
+      if (segments.length > 0) {
+        path = '/' + segments.join('/')
+      }
+    }
+    
+    // Garantir que comece com /api
     if (!path.startsWith('/api')) {
       path = '/api' + (path.startsWith('/') ? path : '/' + path)
     }
     
     const pathOnly = path.split('?')[0]
     
-    // Criar request compatível com Express
-    // O Express precisa que o request tenha as propriedades corretas
-    const expressReq = Object.create(Object.getPrototypeOf(req))
-    Object.assign(expressReq, req, {
-      method: (req.method || 'GET').toUpperCase(),
-      url: path,
-      originalUrl: path,
-      path: pathOnly,
-      baseUrl: '',
-      query: req.query || {},
-      params: {},
-      get: (name: string) => req.headers?.[name.toLowerCase()],
-      header: (name: string) => req.headers?.[name.toLowerCase()]
-    })
+    // Criar um IncomingMessage-like object para o Express
+    const expressReq = new IncomingMessage(req.socket as any) as any
     
-    // Para multipart, garantir que o body não esteja parseado
-    // O Multer precisa processar o stream original
+    // Copiar propriedades essenciais do VercelRequest
+    expressReq.method = (req.method || 'GET').toUpperCase()
+    expressReq.url = path
+    expressReq.originalUrl = path
+    expressReq.path = pathOnly
+    expressReq.query = req.query || {}
+    expressReq.params = {}
+    expressReq.headers = req.headers || {}
+    expressReq.body = req.body
+    
+    // Para multipart, remover body
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
-      // Garantir que o request seja tratado como stream
-      expressReq.readable = true
     }
+    
+    // Métodos do Express Request
+    expressReq.get = function(name: string) {
+      return this.headers?.[name.toLowerCase()]
+    }
+    expressReq.header = expressReq.get
+    expressReq.baseUrl = ''
+    expressReq.protocol = 'https'
+    expressReq.secure = true
+    expressReq.hostname = req.headers?.host?.split(':')[0] || ''
+    expressReq.ip = req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || ''
     
     // Processar no Express
     return new Promise<void>((resolve) => {
@@ -82,41 +103,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const originalJson = res.json.bind(res)
       const originalSend = res.send.bind(res)
       
-      res.end = (...args: any[]) => {
+      res.end = function(...args: any[]) {
         finish()
-        return originalEnd(...args)
+        return originalEnd.apply(this, args)
       }
       
-      res.json = (body?: any) => {
+      res.json = function(body?: any) {
         finish()
-        return originalJson(body)
+        return originalJson.call(this, body)
       }
       
-      res.send = (body?: any) => {
+      res.send = function(body?: any) {
         finish()
-        return originalSend(body)
+        return originalSend.call(this, body)
       }
       
-      // Chamar Express diretamente
-      expressApp(expressReq, res, (err?: any) => {
+      // Chamar Express
+      expressApp(expressReq, res as any, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
           if (!res.headersSent) {
             res.status(500).json({ error: 'Erro interno do servidor' })
           }
+          finish()
         } else if (!res.headersSent) {
-          // Se não houve erro mas resposta não foi enviada, rota não encontrada
-          console.error('Rota não encontrada:', req.method, pathOnly)
+          console.error(`404: ${req.method} ${pathOnly}`)
           res.status(404).json({ 
             error: 'Rota não encontrada',
             method: req.method,
             path: pathOnly
           })
+          finish()
+        } else {
+          finish()
         }
-        finish()
       })
       
-      // Timeout de segurança
+      // Timeout
       setTimeout(() => {
         if (!finished && !res.headersSent) {
           res.status(504).json({ error: 'Timeout' })

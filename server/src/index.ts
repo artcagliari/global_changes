@@ -84,7 +84,8 @@ app.use((req, res, next) => {
   next()
 })
 
-// Rotas da API
+// Rotas da API - IMPORTANTE: ordem importa!
+// Rotas mais específicas primeiro
 app.use('/api/videos', videoRoutes)
 app.use('/api', apiRoutes)
 
