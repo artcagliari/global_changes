@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       header: (name: string) => req.headers?.[name.toLowerCase()],
       protocol: 'https',
       secure: true,
-      hostname: req.headers?.host?.split(':')[0] || '',
+      hostname: (typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '') || '',
       ip: req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || '',
       body: req.body // Preservar body do Vercel (já parseado se for JSON)
     })
