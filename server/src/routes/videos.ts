@@ -78,13 +78,14 @@ router.post('/upload', upload.single('video'), async (req, res) => {
         console.log('   Token configurado:', process.env.BLOB_READ_WRITE_TOKEN ? 'Sim' : 'Não')
         
         // O Vercel Blob detecta automaticamente BLOB_READ_WRITE_TOKEN do ambiente
-        // Mas podemos passar explicitamente se necessário
-        const blobToken = process.env.BLOB_READ_WRITE_TOKEN
+        // Não precisa passar explicitamente, mas verificamos se está configurado
+        if (!process.env.BLOB_READ_WRITE_TOKEN) {
+          console.warn('⚠️  BLOB_READ_WRITE_TOKEN não configurado! O upload pode falhar.')
+        }
         
         const blob = await put(fileName, req.file.buffer, {
           access: 'public',
           contentType: req.file.mimetype || 'video/mp4',
-          token: blobToken, // Passar explicitamente para garantir
         })
         
         videoUrl = blob.url
