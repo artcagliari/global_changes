@@ -478,20 +478,24 @@ const Admin = () => {
               </button>
             </div>
             <div className="video-container" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-              <video 
-                controls 
-                width="100%" 
-                height="auto"
-                className="moderation-video"
-                key={selectedVideo}
-                style={{
-                  borderRadius: '12px',
-                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <source src={`${API_URL}/uploads/videos/${selectedVideo}?t=${Date.now()}`} />
-                Seu navegador não suporta a reprodução de vídeos.
-              </video>
+              <div style={{
+                padding: '2rem',
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
+                borderRadius: '12px',
+                border: '2px dashed #10b981'
+              }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📹</div>
+                <h4 style={{ color: '#065f46', marginBottom: '0.5rem' }}>Vídeo: {selectedVideo}</h4>
+                <p style={{ color: '#047857', marginBottom: '1rem' }}>
+                  No Vercel, os vídeos não são salvos fisicamente.<br/>
+                  Eles são processados e apenas o registro é mantido no banco.
+                </p>
+                <p style={{ color: '#059669', fontSize: '0.9rem' }}>
+                  💡 Para produção, configure Vercel Blob Storage ou AWS S3<br/>
+                  para armazenar e servir os vídeos.
+                </p>
+              </div>
             </div>
           </div>
         </div>
