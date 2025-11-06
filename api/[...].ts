@@ -58,8 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const pathOnly = path.split('?')[0]
     
-    // Criar request object compatível usando Object.assign (método que funcionava)
-    const expressReq: any = Object.assign({}, req, {
+    // Criar request object compatível - usando spread operator como estava funcionando
+    const expressReq: any = {
+      ...req,
       method: (req.method || 'GET').toUpperCase(),
       url: path,
       originalUrl: path,
@@ -71,13 +72,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       header: (name: string) => req.headers?.[name.toLowerCase()],
       protocol: 'https',
       secure: true,
-      hostname: (typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '') || '',
-      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || '',
-      body: req.body // Passar body diretamente do Vercel
-    })
+      hostname: typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '',
+      ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '',
+      body: req.body // Garantir que body seja passado explicitamente
+    }
     
-    // Para multipart, remover body para o Multer processar o stream
-    if (req.headers['content-type']?.includes('multipart/form-data')) {
+    // Para multipart, remover body para o Multer processar
+    if (typeof req.headers['content-type'] === 'string' && req.headers['content-type'].includes('multipart/form-data')) {
       delete expressReq.body
     }
     
