@@ -401,6 +401,14 @@ router.post('/submissions', async (req, res) => {
   try {
     const { userId, videoUrl } = req.body
     
+    if (!userId) {
+      return res.status(400).json({ error: 'ID do usuário é obrigatório' })
+    }
+    
+    if (!videoUrl) {
+      return res.status(400).json({ error: 'URL do vídeo é obrigatória' })
+    }
+    
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
@@ -417,9 +425,65 @@ router.post('/submissions', async (req, res) => {
       }
     })
 
+    console.log('✅ Submissão criada:', submission.id, 'URL:', videoUrl)
     res.json(submission)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create submission' })
+  } catch (error: any) {
+    console.error('❌ Erro ao criar submissão:', error)
+    res.status(500).json({ 
+      error: 'Failed to create submission',
+      message: error.message 
+    })
+  }
+})
+
+// Criar submissão a partir de arquivo já existente no Blob
+// Útil para adicionar arquivos que foram enviados manualmente para o Blob
+router.post('/submissions/from-blob', async (req, res) => {
+  try {
+    const { userId, blobUrl } = req.body
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'ID do usuário é obrigatório' })
+    }
+    
+    if (!blobUrl) {
+      return res.status(400).json({ error: 'URL do Blob é obrigatória' })
+    }
+    
+    // Validar se é uma URL válida
+    if (!blobUrl.startsWith('http://') && !blobUrl.startsWith('https://')) {
+      return res.status(400).json({ error: 'URL do Blob deve ser uma URL completa (http:// ou https://)' })
+    }
+    
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' })
+    }
+
+    const submission = await prisma.submission.create({
+      data: {
+        userId,
+        videoUrl: blobUrl,
+        status: 'PENDING'
+      },
+      include: {
+        user: true
+      }
+    })
+
+    console.log('✅ Submissão criada a partir do Blob:', submission.id)
+    console.log('   URL do Blob:', blobUrl)
+    res.json({
+      success: true,
+      submission,
+      message: 'Arquivo do Blob adicionado ao sistema com sucesso'
+    })
+  } catch (error: any) {
+    console.error('❌ Erro ao criar submissão do Blob:', error)
+    res.status(500).json({ 
+      error: 'Erro ao criar submissão',
+      message: error.message 
+    })
   }
 })
 
