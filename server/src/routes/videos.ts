@@ -43,9 +43,21 @@ if (isVercel) {
   upload = multer({ storage: storage })
 }
 
-router.post('/upload', upload.single('video'), async (req: Request, res: Response) => {
+// Middleware para upload - no Vercel, o arquivo já vem processado no req.file
+const uploadMiddleware = (req: Request, res: Response, next: any) => {
+  // Se já tem req.file (processado pelo handler do Vercel), pular Multer
+  if ((req as any).file) {
+    return next()
+  }
+  // Senão, usar Multer
+  upload.single('video')(req, res, next)
+}
+
+router.post('/upload', uploadMiddleware, async (req: Request, res: Response) => {
   try {
-    if (!req.file) {
+    // No Vercel, req.file vem do handler; em dev, vem do Multer
+    const file = (req as any).file || req.file
+    if (!file) {
       return res.status(400).json({ message: 'Nenhum arquivo de vídeo enviado.' })
     }
 
@@ -65,19 +77,19 @@ router.post('/upload', upload.single('video'), async (req: Request, res: Respons
     // Gerar URL do vídeo
     let videoUrl: string
 
-    if (isVercel && req.file.buffer) {
+    if (isVercel && file.buffer) {
       // Em Vercel, fazer upload para o Blob Storage
       try {
         // Import dinâmico do Blob apenas quando necessário
         const { put } = await import('@vercel/blob')
         
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-        const ext = path.extname(req.file.originalname || '.mp4')
+        const ext = path.extname(file.originalname || '.mp4')
         const fileName = `videos/video-${uniqueSuffix}${ext}`
         
-        const blob = await put(fileName, req.file.buffer, {
+        const blob = await put(fileName, file.buffer, {
           access: 'public',
-          contentType: req.file.mimetype || 'video/mp4',
+          contentType: file.mimetype || 'video/mp4',
         })
         
         videoUrl = blob.url
@@ -87,7 +99,7 @@ router.post('/upload', upload.single('video'), async (req: Request, res: Respons
       }
     } else {
       // Em desenvolvimento, usar nome do arquivo salvo localmente
-      videoUrl = req.file.filename
+      videoUrl = file.filename
     }
 
     // Criar submissão
