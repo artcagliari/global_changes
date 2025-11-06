@@ -58,10 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const pathOnly = path.split('?')[0]
     
-    // Criar request object compatível - SEM passar body explicitamente
-    // O spread operator já passa tudo, incluindo o body parseado pelo Vercel
+    // Criar request object compatível
     const expressReq: any = {
-      ...req,
       method: (req.method || 'GET').toUpperCase(),
       url: path,
       originalUrl: path,
@@ -69,17 +67,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       baseUrl: '',
       query: req.query || {},
       params: {},
+      headers: req.headers || {},
       get: (name: string) => req.headers?.[name.toLowerCase()],
       header: (name: string) => req.headers?.[name.toLowerCase()],
       protocol: 'https',
       secure: true,
       hostname: typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '',
-      ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : ''
-    }
-    
-    // Para multipart, remover body para o Multer processar
-    if (req.headers['content-type']?.includes('multipart/form-data')) {
-      delete expressReq.body
+      ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '',
+      // Body - passar apenas se não for multipart
+      body: req.headers['content-type']?.includes('multipart/form-data') ? undefined : req.body
     }
     
     // Processar no Express
@@ -116,16 +112,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       expressApp(expressReq, res as any, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
+          console.error('Stack:', err.stack)
           if (!res.headersSent) {
-            res.status(500).json({ error: 'Erro interno do servidor' })
+            res.status(500).json({ error: 'Erro interno do servidor', message: err.message })
           }
           finish()
         } else if (!res.headersSent) {
-          res.status(404).json({ 
-            error: 'Rota não encontrada',
-            method: req.method,
-            path: pathOnly
-          })
+          // Não retornar 404 automaticamente - deixar o Express lidar
           finish()
         } else {
           finish()
@@ -142,8 +135,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   } catch (error: any) {
     console.error('Erro no handler:', error.message)
+    console.error('Stack:', error.stack)
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Erro ao processar requisição' })
+      res.status(500).json({ 
+        error: 'Erro ao processar requisição',
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
     }
   }
 }
