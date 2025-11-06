@@ -121,19 +121,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isUploadRoute = pathOnly === '/api/videos/upload'
     
     // Se for upload de vídeo, processar multipart manualmente
-    if (isMultipart && isUploadRoute && req.body) {
+    if (isMultipart && isUploadRoute) {
+      // No Vercel, req.body pode não estar disponível para multipart
+      // Precisamos processar de forma diferente
+      if (!req.body) {
+        // Se não tem body, o Vercel pode não ter exposto o body raw
+        // Retornar erro informativo
+        return res.status(400).json({ 
+          error: 'Body não disponível para multipart',
+          message: 'O Vercel pode não expor o body raw para multipart/form-data. Verifique a configuração.'
+        })
+      }
+      
       return new Promise<void>((resolve) => {
         const formData: any = {}
         const files: any = {}
         
-        // Criar stream do body
+        // Criar stream do body - no Vercel, req.body pode ser Buffer, string, ou undefined
         let bodyStream: Readable
+        
         if (Buffer.isBuffer(req.body)) {
           bodyStream = Readable.from(req.body)
         } else if (typeof req.body === 'string') {
           bodyStream = Readable.from(Buffer.from(req.body))
+        } else if (req.body instanceof Uint8Array) {
+          bodyStream = Readable.from(Buffer.from(req.body))
         } else {
-          return res.status(400).json({ error: 'Body inválido para multipart' })
+          // Tentar converter para Buffer
+          try {
+            const buffer = Buffer.from(JSON.stringify(req.body))
+            bodyStream = Readable.from(buffer)
+          } catch (err) {
+            return res.status(400).json({ error: 'Body inválido para multipart', details: typeof req.body })
+          }
         }
         
         const bb = busboy({ headers: req.headers as any })

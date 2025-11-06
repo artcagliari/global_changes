@@ -45,11 +45,23 @@ if (isVercel) {
 
 // Middleware para upload - no Vercel, o arquivo já vem processado no req.file
 const uploadMiddleware = (req: Request, res: Response, next: any) => {
+  const reqAny = req as any
+  
   // Se já tem req.file (processado pelo handler do Vercel), pular Multer
-  if ((req as any).file) {
+  if (reqAny.file) {
     return next()
   }
-  // Senão, usar Multer
+  
+  // No Vercel, se for multipart e não tem req.file, é erro (deveria ter sido processado pelo handler)
+  const isMultipart = req.headers['content-type']?.includes('multipart/form-data')
+  if (isVercel && isMultipart) {
+    return res.status(500).json({ 
+      error: 'Erro ao processar upload',
+      message: 'Arquivo não foi processado corretamente pelo handler'
+    })
+  }
+  
+  // Senão, usar Multer (apenas em desenvolvimento local)
   upload.single('video')(req, res, next)
 }
 
