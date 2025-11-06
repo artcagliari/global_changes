@@ -443,26 +443,10 @@ router.patch('/submissions/:id/approve', async (req, res) => {
       data: { points: { increment: 1 } }
     })
 
-    // Deletar o arquivo de vídeo
+    // Deletar o arquivo de vídeo (apenas em desenvolvimento)
     const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
     
-    if (isVercel && submission.videoUrl.startsWith('http')) {
-      // Deletar do Blob Storage
-      try {
-        if (process.env.BLOB_READ_WRITE_TOKEN) {
-          const { del } = await import('@vercel/blob')
-          await del(submission.videoUrl, {
-            token: process.env.BLOB_READ_WRITE_TOKEN
-          })
-          console.log('✅ Vídeo deletado do Blob Storage')
-        } else {
-          console.warn('⚠️  BLOB_READ_WRITE_TOKEN não configurado, não foi possível deletar do Blob')
-        }
-      } catch (blobError: any) {
-        console.warn('Não foi possível deletar do Blob Storage:', blobError.message)
-        // Não falhar a aprovação
-      }
-    } else if (!isVercel) {
+    if (!isVercel) {
       // Em desenvolvimento, deletar do disco
       const videoPath = path.join(__dirname, '..', '..', 'uploads', 'videos', submission.videoUrl)
       try {
