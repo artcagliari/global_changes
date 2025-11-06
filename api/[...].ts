@@ -30,11 +30,13 @@ async function getApp() {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log(`🚀 Handler chamado: ${req.method} ${req.url}`)
   try {
     const expressApp = await getApp()
     
     // Construir path
     let path = req.url || '/'
+    console.log(`   Path original: ${path}`)
     
     // Se não tiver path, construir do query (catch-all do Vercel)
     if (!path || path === '/') {
@@ -57,6 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const pathOnly = path.split('?')[0]
+    console.log(`   Path final: ${pathOnly}`)
+    console.log(`   Content-Type: ${req.headers['content-type']}`)
     
     // Criar request object compatível
     const expressReq: any = {
@@ -112,6 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       
       // Chamar Express app
+      console.log(`   Passando para Express: ${expressReq.method} ${expressReq.path}`)
       expressApp(expressReq, res as any, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
