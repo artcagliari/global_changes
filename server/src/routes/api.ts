@@ -14,57 +14,38 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
     
-    // Validação básica
     if (!email || !password) {
       return res.status(400).json({ error: 'Email e senha são obrigatórios' })
     }
     
-    console.log('🔐 Tentativa de login:', { email, password: '***' })
-    
-    // Verificar se DATABASE_URL está configurado
     if (!process.env.DATABASE_URL) {
-      console.error('❌ DATABASE_URL não configurado')
       return res.status(500).json({ 
         error: 'Banco de dados não configurado',
-        message: 'DATABASE_URL não está definido. Configure no Vercel: Settings → Environment Variables'
+        message: 'DATABASE_URL não está definido'
       })
     }
     
-    console.log('🔍 DATABASE_URL configurado:', process.env.DATABASE_URL.substring(0, 20) + '...')
-    
-    // Garantir conexão com o banco
     const connected = await ensureConnection()
     if (!connected) {
-      console.error('❌ Não foi possível conectar ao banco de dados')
       return res.status(500).json({ 
         error: 'Erro de conexão com banco de dados',
-        message: 'Não foi possível conectar ao banco. Verifique se DATABASE_URL está correto no Vercel.',
-        hint: 'Verifique as variáveis de ambiente no Vercel'
+        message: 'Não foi possível conectar ao banco'
       })
     }
     
-    console.log('✅ Prisma conectado ao banco')
-    
-    // Simulação de senha (em produção, usar hash)
+    // Validação de senha (em produção, usar hash)
     if (password !== '123') {
-      console.log('❌ Senha incorreta para:', email)
       return res.status(401).json({ error: 'Credenciais inválidas' })
     }
     
-    // Buscar usuário
-    console.log('🔍 Buscando usuário:', email)
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() }
     })
     
     if (!user) {
-      console.log('❌ Usuário não encontrado:', email)
       return res.status(401).json({ error: 'Credenciais inválidas' })
     }
     
-    console.log('✅ Login bem-sucedido:', user.email, user.name)
-    
-    // Retornar usuário sem informações sensíveis
     res.json({
       id: user.id,
       name: user.name,
@@ -74,33 +55,16 @@ router.post('/login', async (req, res) => {
       createdAt: user.createdAt
     })
   } catch (error: any) {
-    console.error('❌ Erro no login:', error.message)
-    console.error('Stack:', error.stack)
-    console.error('Código:', error.code)
-    console.error('Nome:', error.name)
+    console.error('Erro no login:', error.message)
     
-    // Mensagem mais clara para o usuário baseada no código de erro
     let userMessage = 'Erro ao fazer login'
-    let statusCode = 500
-    
-    if (error.code === 'P1001') {
-      userMessage = 'Não foi possível conectar ao banco de dados. Verifique se DATABASE_URL está configurado no Vercel.'
-      statusCode = 500
-    } else if (error.code === 'P1000') {
-      userMessage = 'Falha na autenticação do banco de dados. Verifique as credenciais do banco.'
-      statusCode = 500
-    } else if (error.code === 'P2002') {
-      userMessage = 'Erro de integridade de dados'
-      statusCode = 500
-    } else if (error.name === 'PrismaClientInitializationError') {
-      userMessage = 'Erro ao inicializar conexão com banco de dados. Verifique DATABASE_URL.'
-      statusCode = 500
+    if (error.code === 'P1001' || error.code === 'P1000') {
+      userMessage = 'Erro de conexão com banco de dados'
     }
     
-    res.status(statusCode).json({ 
+    res.status(500).json({ 
       error: userMessage,
-      message: error.message,
-      code: error.code 
+      message: error.message
     })
   }
 })
@@ -121,16 +85,11 @@ router.get('/users', async (req, res) => {
 router.get('/users/:id', async (req, res) => {
   try {
     const { id } = req.params
-    console.log(`🔍 GET /users/:id - ID recebido: ${id}`)
-    console.log(`   Params:`, req.params)
-    console.log(`   Path: ${req.path}`)
-    
     const user = await prisma.user.findUnique({
       where: { id }
     })
     
     if (!user) {
-      console.log(`❌ Usuário não encontrado: ${id}`)
       return res.status(404).json({ error: 'User not found' })
     }
     
@@ -210,8 +169,6 @@ router.patch('/users/:id', async (req, res) => {
 router.delete('/users/:id', async (req, res) => {
   try {
     const { id } = req.params
-    
-    console.log('🗑️  Deletando usuário:', id)
     
     // Deletar submissões primeiro (cascade)
     await prisma.submission.deleteMany({

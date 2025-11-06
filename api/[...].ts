@@ -1,32 +1,23 @@
 // Vercel Serverless Function - Catch-all route para Express
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-// Cache do app Express
 let app: any = null
 
 async function getApp() {
   if (!app) {
     try {
-      console.log('📦 Inicializando servidor Express...')
-      
-      // Importar o app Express
-      let serverModule: any = null
-      
+      let serverModule: any
       try {
         serverModule = await import('../server/src/index.js')
-      } catch (error: any) {
+      } catch {
         serverModule = await import('../server/dist/index.js')
       }
-      
       app = serverModule.default
-      
       if (!app) {
         throw new Error('App Express não foi exportado corretamente')
       }
-      
-      console.log('✅ Servidor Express carregado')
     } catch (error: any) {
-      console.error('❌ Erro ao carregar servidor:', error.message)
+      console.error('Erro ao carregar servidor:', error.message)
       throw error
     }
   }
@@ -37,15 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // Extrair path do URL
+    // Construir path
     let path = req.url || '/'
-    
-    // Se não tiver /api, adicionar
     if (!path.startsWith('/api')) {
       path = '/api' + (path.startsWith('/') ? path : '/' + path)
     }
     
-    // Criar request simples para Express
+    // Criar request compatível com Express
     const expressReq = {
       ...req,
       method: (req.method || 'GET').toUpperCase(),
@@ -59,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       header: (name: string) => req.headers?.[name.toLowerCase()]
     } as any
     
-    // Para multipart, remover body
+    // Remover body para multipart (Multer vai processar)
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
     }
@@ -67,7 +56,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Processar no Express
     return new Promise<void>((resolve) => {
       let finished = false
-      
       const finish = () => {
         if (!finished) {
           finished = true
@@ -77,19 +65,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       // Interceptar métodos de resposta
       const originalEnd = res.end.bind(res)
-      res.end = function(...args: any[]) {
+      const originalJson = res.json.bind(res)
+      const originalSend = res.send.bind(res)
+      
+      res.end = (...args: any[]) => {
         finish()
         return originalEnd(...args)
       }
       
-      const originalJson = res.json.bind(res)
-      res.json = function(body?: any) {
+      res.json = (body?: any) => {
         finish()
         return originalJson(body)
       }
       
-      const originalSend = res.send.bind(res)
-      res.send = function(body?: any) {
+      res.send = (body?: any) => {
         finish()
         return originalSend(body)
       }
@@ -97,20 +86,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Chamar Express
       expressApp(expressReq, res, (err?: any) => {
         if (err) {
-          console.error('❌ Erro no Express:', err.message)
+          console.error('Erro no Express:', err.message)
           if (!res.headersSent) {
-            res.status(500).json({ error: 'Erro interno do servidor', message: err.message })
+            res.status(500).json({ error: 'Erro interno do servidor' })
           }
-          finish()
         } else if (!res.headersSent) {
-          res.status(404).json({ error: 'Rota não encontrada', path: path })
-          finish()
-        } else {
-          finish()
+          res.status(404).json({ error: 'Rota não encontrada' })
         }
+        finish()
       })
       
-      // Timeout
+      // Timeout de segurança
       setTimeout(() => {
         if (!finished && !res.headersSent) {
           res.status(504).json({ error: 'Timeout' })
@@ -119,14 +105,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }, 30000)
     })
   } catch (error: any) {
-    console.error('❌ Erro no handler:', error.message)
-    console.error('Stack:', error.stack)
-    
+    console.error('Erro no handler:', error.message)
     if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Erro ao processar requisição',
-        message: error.message
-      })
+      res.status(500).json({ error: 'Erro ao processar requisição' })
     }
   }
 }
