@@ -18,12 +18,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    // handleUpload recebe body e token, e lida com o multipart internamente
-    // O body pode ser JSON (com dados do upload) ou undefined
-    const body = req.body ? (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {}
+    // Criar um objeto Request do Fetch API a partir do VercelRequest
+    // O handleUpload precisa do request para acessar a URL
+    const protocol = req.headers['x-forwarded-proto'] || 'https'
+    const host = req.headers.host || req.headers['x-forwarded-host'] || 'localhost'
+    const url = `${protocol}://${host}${req.url || '/api/upload'}`
     
+    const request = new Request(url, {
+      method: req.method,
+      headers: req.headers as HeadersInit,
+      body: req.body ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body)) : undefined,
+    })
+
+    // handleUpload recebe request e token
     const jsonResponse = await handleUpload({
-      body,
+      request,
+      body: req.body ? (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {},
       token,
       onBeforeGenerateToken: async (pathname) => {
         // Validar se é um vídeo
