@@ -4,6 +4,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { prisma } from '../lib/prisma.js'
+import { put, del, head } from '@vercel/blob'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -44,16 +45,10 @@ if (isVercel) {
 }
 
 router.post('/upload', upload.single('video'), async (req, res) => {
-  console.log('📹 Rota /upload chamada!')
-  console.log('   Método:', req.method)
-  console.log('   Path:', req.path)
-  console.log('   URL:', req.url)
   try {
     if (!req.file) {
-      console.log('   Nenhum arquivo recebido')
       return res.status(400).json({ message: 'Nenhum arquivo de vídeo enviado.' })
     }
-    console.log('   Arquivo recebido:', req.file.originalname)
 
     const { userId } = req.body
     if (!userId) {
@@ -70,11 +65,33 @@ router.post('/upload', upload.single('video'), async (req, res) => {
 
     // Gerar URL do vídeo
     let videoUrl: string
+    let blobUrl: string | null = null
+
     if (isVercel) {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-      const ext = path.extname(req.file.originalname || '.mp4')
-      videoUrl = `video-${uniqueSuffix}${ext}`
+      // No Vercel, salvar no Blob Storage
+      try {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        const ext = path.extname(req.file.originalname || '.mp4')
+        const fileName = `videos/video-${uniqueSuffix}${ext}`
+        
+        const blob = await put(fileName, req.file.buffer, {
+          access: 'public',
+          contentType: req.file.mimetype || 'video/mp4',
+        })
+        
+        blobUrl = blob.url
+        videoUrl = blob.url // Usar a URL do Blob como identificador
+        console.log('✅ Vídeo salvo no Vercel Blob:', blobUrl)
+      } catch (blobError: any) {
+        console.error('Erro ao salvar no Blob Storage:', blobError.message)
+        // Fallback: usar nome do arquivo mesmo sem salvar
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        const ext = path.extname(req.file.originalname || '.mp4')
+        videoUrl = `video-${uniqueSuffix}${ext}`
+        console.warn('⚠️  Usando fallback (vídeo não será acessível)')
+      }
     } else {
+      // Em desenvolvimento, salvar no disco
       videoUrl = req.file.filename
     }
 
@@ -82,7 +99,7 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     const submission = await prisma.submission.create({
       data: {
         userId: userId,
-        videoUrl: videoUrl,
+        videoUrl: videoUrl, // URL completa do Blob ou nome do arquivo
         status: 'pending'
       }
     })
@@ -90,7 +107,8 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     res.status(200).json({ 
       message: 'Vídeo enviado com sucesso!', 
       fileName: videoUrl,
-      submissionId: submission.id
+      submissionId: submission.id,
+      videoUrl: blobUrl || videoUrl
     })
   } catch (error: any) {
     console.error('Erro no upload:', error.message)
@@ -98,6 +116,39 @@ router.post('/upload', upload.single('video'), async (req, res) => {
       message: 'Erro ao processar upload',
       error: error.message 
     })
+  }
+})
+
+// Rota para servir vídeos (proxy para Blob Storage)
+router.get('/watch/:videoUrl(*)', async (req, res) => {
+  try {
+    const videoUrl = decodeURIComponent(req.params.videoUrl)
+    
+    // Se for uma URL do Blob Storage, fazer proxy
+    if (videoUrl.startsWith('http')) {
+      const response = await fetch(videoUrl)
+      if (!response.ok) {
+        return res.status(404).json({ error: 'Vídeo não encontrado' })
+      }
+      
+      const contentType = response.headers.get('content-type') || 'video/mp4'
+      res.setHeader('Content-Type', contentType)
+      res.setHeader('Cache-Control', 'public, max-age=3600')
+      
+      const buffer = await response.arrayBuffer()
+      res.send(Buffer.from(buffer))
+    } else {
+      // Em desenvolvimento, servir do disco
+      const videoPath = path.join(__dirname, '..', '..', 'uploads', 'videos', videoUrl)
+      if (fs.existsSync(videoPath)) {
+        res.sendFile(videoPath)
+      } else {
+        res.status(404).json({ error: 'Vídeo não encontrado' })
+      }
+    }
+  } catch (error: any) {
+    console.error('Erro ao servir vídeo:', error.message)
+    res.status(500).json({ error: 'Erro ao servir vídeo' })
   }
 })
 

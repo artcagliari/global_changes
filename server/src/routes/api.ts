@@ -3,6 +3,7 @@ import { prisma, ensureConnection } from '../lib/prisma.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { del } from '@vercel/blob'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -443,10 +444,20 @@ router.patch('/submissions/:id/approve', async (req, res) => {
       data: { points: { increment: 1 } }
     })
 
-    // Deletar o arquivo físico do vídeo (apenas em desenvolvimento/local)
-    // No Vercel, os vídeos não são salvos fisicamente (apenas em memória durante upload)
+    // Deletar o arquivo de vídeo
     const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
-    if (!isVercel) {
+    
+    if (isVercel && submission.videoUrl.startsWith('http')) {
+      // No Vercel, deletar do Blob Storage
+      try {
+        await del(submission.videoUrl)
+        console.log('✅ Vídeo deletado do Blob Storage:', submission.videoUrl)
+      } catch (blobError: any) {
+        console.error('Erro ao deletar do Blob Storage:', blobError.message)
+        // Não falhar a aprovação se houver erro ao deletar
+      }
+    } else if (!isVercel) {
+      // Em desenvolvimento, deletar do disco
       const videoPath = path.join(__dirname, '..', '..', 'uploads', 'videos', submission.videoUrl)
       try {
         if (fs.existsSync(videoPath)) {
@@ -457,10 +468,6 @@ router.patch('/submissions/:id/approve', async (req, res) => {
         console.error('Erro ao deletar arquivo de vídeo:', fileError)
         // Não falhar a aprovação se o arquivo não existir ou houver erro ao deletar
       }
-    } else {
-      // No Vercel, os vídeos não são salvos fisicamente (apenas em memória durante upload)
-      // Não há arquivo para deletar, apenas o registro do banco
-      console.log('⚠️  Vercel: vídeo não foi salvo fisicamente (apenas em memória durante upload)')
     }
 
     // Deletar o registro do banco de dados (remove o vídeo do sistema)
