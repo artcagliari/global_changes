@@ -122,38 +122,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Se for upload de vídeo, processar multipart manualmente
     if (isMultipart && isUploadRoute) {
-      // No Vercel, req.body pode não estar disponível para multipart
-      // Precisamos processar de forma diferente
-      if (!req.body) {
-        // Se não tem body, o Vercel pode não ter exposto o body raw
-        // Retornar erro informativo
-        return res.status(400).json({ 
-          error: 'Body não disponível para multipart',
-          message: 'O Vercel pode não expor o body raw para multipart/form-data. Verifique a configuração.'
-        })
-      }
-      
       return new Promise<void>((resolve) => {
         const formData: any = {}
         const files: any = {}
         
-        // Criar stream do body - no Vercel, req.body pode ser Buffer, string, ou undefined
-        let bodyStream: Readable
+        // No Vercel, precisamos acessar o body de forma diferente
+        // Tentar várias formas de acessar o body raw
+        let bodyStream: Readable | null = null
         
-        if (Buffer.isBuffer(req.body)) {
+        // Tentar 1: req.body como Buffer
+        if (req.body && Buffer.isBuffer(req.body)) {
           bodyStream = Readable.from(req.body)
-        } else if (typeof req.body === 'string') {
+        }
+        // Tentar 2: req.body como string
+        else if (req.body && typeof req.body === 'string') {
           bodyStream = Readable.from(Buffer.from(req.body))
-        } else if (req.body instanceof Uint8Array) {
+        }
+        // Tentar 3: req.body como Uint8Array
+        else if (req.body && req.body instanceof Uint8Array) {
           bodyStream = Readable.from(Buffer.from(req.body))
-        } else {
-          // Tentar converter para Buffer
-          try {
-            const buffer = Buffer.from(JSON.stringify(req.body))
-            bodyStream = Readable.from(buffer)
-          } catch (err) {
-            return res.status(400).json({ error: 'Body inválido para multipart', details: typeof req.body })
-          }
+        }
+        // Tentar 4: acessar através de req (pode ter propriedades internas)
+        else if ((req as any).rawBody) {
+          bodyStream = Readable.from((req as any).rawBody)
+        }
+        // Tentar 5: criar stream vazio e processar depois (não ideal, mas pode funcionar)
+        else {
+          // Se não conseguimos acessar o body, retornar erro informativo
+          return res.status(400).json({ 
+            error: 'Não foi possível acessar o body da requisição',
+            message: 'O Vercel pode não expor o body raw para multipart/form-data automaticamente.',
+            suggestion: 'Considere usar Vercel Blob Storage diretamente do frontend.'
+          })
         }
         
         const bb = busboy({ headers: req.headers as any })

@@ -32,31 +32,69 @@ const Upload = () => {
       setIsUploading(true)
       setMessage('Enviando vídeo...')
 
-      const formData = new FormData()
-      formData.append('video', file)
-      formData.append('userId', currentUser.id)
+      // Em produção (Vercel), fazer upload direto para Blob Storage
+      // Em desenvolvimento, usar o fluxo normal
+      const isProduction = import.meta.env.PROD
+      let videoUrl: string
 
-      console.log('📤 Enviando vídeo para:', `${API_URL}/api/videos/upload`)
-      console.log('   Arquivo:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`)
-      
-      const response = await fetch(`${API_URL}/api/videos/upload`, {
-        method: 'POST',
-        body: formData,
-        // Não adicionar Content-Type - o browser define automaticamente com boundary para multipart
-      })
+      if (isProduction) {
+        // Upload direto para Vercel Blob
+        console.log('📤 Fazendo upload direto para Vercel Blob...')
+        
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        // Usar a API do Vercel Blob
+        const blobResponse = await fetch('/api/upload-blob', {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (!blobResponse.ok) {
+          throw new Error('Erro ao fazer upload para Blob Storage')
+        }
+        
+        const blobData = await blobResponse.json()
+        videoUrl = blobData.url
+        console.log('✅ Upload para Blob concluído:', videoUrl)
+      } else {
+        // Em desenvolvimento, usar o fluxo normal
+        const formData = new FormData()
+        formData.append('video', file)
+        formData.append('userId', currentUser.id)
 
-      console.log('📥 Resposta do servidor:', response.status, response.statusText)
+        console.log('📤 Enviando vídeo para:', `${API_URL}/api/videos/upload`)
+        
+        const response = await fetch(`${API_URL}/api/videos/upload`, {
+          method: 'POST',
+          body: formData,
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('❌ Erro no upload:', errorData)
-        throw new Error(errorData.message || `Erro ${response.status}: ${response.statusText}`)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Erro ${response.status}`)
+        }
+
+        const data = await response.json()
+        videoUrl = data.videoUrl
       }
 
-      const data = await response.json()
-      console.log('✅ Upload bem-sucedido:', data)
+      // Enviar URL para o backend salvar no banco
+      console.log('💾 Salvando URL no banco de dados...')
+      const saveResponse = await fetch(`${API_URL}/api/submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          videoUrl: videoUrl
+        })
+      })
 
-      // O backend já salvou no banco, não precisamos duplicar
+      if (!saveResponse.ok) {
+        throw new Error('Erro ao salvar vídeo no banco de dados')
+      }
+
+      console.log('✅ Upload bem-sucedido!')
       setMessage('Vídeo enviado com sucesso! Aguardando aprovação.')
 
       setFile(null)
