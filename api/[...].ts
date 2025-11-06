@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // Construir path do query (catch-all do Vercel)
+    // Construir path
     let path = '/api'
     const segments: string[] = []
     
@@ -51,15 +51,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       path = req.url.startsWith('/') ? req.url : '/' + req.url
     }
     
-    // Garantir /api no início
     if (!path.startsWith('/api')) {
       path = '/api' + (path.startsWith('/') ? path : '/' + path)
     }
     
     const pathOnly = path.split('?')[0]
     
-    // Criar request object compatível - simplificado e robusto
-    const expressReq: any = Object.assign({}, req, {
+    // Criar request object simples
+    const expressReq: any = {
+      ...req,
       method: (req.method || 'GET').toUpperCase(),
       url: path,
       originalUrl: path,
@@ -68,23 +68,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       query: req.query || {},
       params: {},
       get: (name: string) => {
-        const header = req.headers?.[name.toLowerCase()]
-        return typeof header === 'string' ? header : undefined
+        const val = req.headers?.[name.toLowerCase()]
+        return Array.isArray(val) ? val[0] : val
       },
       header: (name: string) => {
-        const header = req.headers?.[name.toLowerCase()]
-        return typeof header === 'string' ? header : undefined
+        const val = req.headers?.[name.toLowerCase()]
+        return Array.isArray(val) ? val[0] : val
       },
       protocol: 'https',
       secure: true,
-      hostname: (typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '') || '',
-      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || '',
-      body: req.body || undefined // Passar body se existir
-    })
+      hostname: typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '',
+      ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '',
+      body: req.body
+    }
     
-    // Para multipart, remover body para o Multer processar
-    const contentType = req.headers['content-type']
-    if (typeof contentType === 'string' && contentType.includes('multipart/form-data')) {
+    // Para multipart, remover body
+    if (typeof req.headers['content-type'] === 'string' && req.headers['content-type'].includes('multipart/form-data')) {
       delete expressReq.body
     }
     
@@ -98,7 +97,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       
-      // Interceptar métodos de resposta
       const originalEnd = res.end.bind(res)
       const originalJson = res.json.bind(res)
       const originalSend = res.send.bind(res)
@@ -118,16 +116,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return originalSend.call(this, body)
       }
       
-      // Chamar Express app
       expressApp(expressReq, res as any, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
-          console.error('Stack:', err.stack)
           if (!res.headersSent) {
-            res.status(500).json({ 
-              error: 'Erro interno do servidor',
-              message: err.message 
-            })
+            res.status(500).json({ error: 'Erro interno do servidor' })
           }
           finish()
         } else if (!res.headersSent) {
@@ -142,7 +135,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       })
       
-      // Timeout de segurança
       setTimeout(() => {
         if (!finished && !res.headersSent) {
           res.status(504).json({ error: 'Timeout' })
