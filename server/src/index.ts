@@ -14,7 +14,7 @@ const app = express()
 
 // CORS
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     if (process.env.NODE_ENV !== 'production') {
       return callback(null, true)
     }
@@ -72,15 +72,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Middleware para normalizar request
 app.use((req, res, next) => {
-  if (!req.path && req.url) {
-    req.path = req.url.split('?')[0]
-  }
-  if (!req.originalUrl && req.url) {
-    req.originalUrl = req.url
-  }
-  if (req.method) {
-    req.method = req.method.toUpperCase()
-  }
+  // req.path, req.originalUrl e req.method são read-only, mas o Express já normaliza automaticamente
   next()
 })
 

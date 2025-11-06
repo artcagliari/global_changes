@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
 import { prisma, ensureConnection } from '../lib/prisma.js'
 import fs from 'fs'
 import path from 'path'
@@ -397,7 +397,7 @@ router.get('/submissions', async (req, res) => {
 })
 
 // Criar submissão
-router.post('/submissions', async (req, res) => {
+router.post('/submissions', async (req: Request, res: Response) => {
   try {
     const { userId, videoUrl } = req.body
     
@@ -437,7 +437,7 @@ router.post('/submissions', async (req, res) => {
 })
 
 // Aprovar submissão
-router.patch('/submissions/:id/approve', async (req, res) => {
+router.patch('/submissions/:id/approve', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     
@@ -499,7 +499,7 @@ router.patch('/submissions/:id/approve', async (req, res) => {
 })
 
 // Rejeitar submissão
-router.patch('/submissions/:id/reject', async (req, res) => {
+router.patch('/submissions/:id/reject', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     

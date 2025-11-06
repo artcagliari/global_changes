@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
 import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -12,7 +12,7 @@ const router = Router()
 
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
 
-let upload: multer.Multer
+let upload: ReturnType<typeof multer>
 
 if (isVercel) {
   upload = multer({ 
@@ -31,10 +31,10 @@ if (isVercel) {
   }
 
   const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
+    destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
       cb(null, uploadsDir)
     },
-    filename: (req, file, cb) => {
+    filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
       cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
     },
@@ -43,7 +43,7 @@ if (isVercel) {
   upload = multer({ storage: storage })
 }
 
-router.post('/upload', upload.single('video'), async (req, res) => {
+router.post('/upload', upload.single('video'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'Nenhum arquivo de vídeo enviado.' })
@@ -116,7 +116,7 @@ router.post('/upload', upload.single('video'), async (req, res) => {
 
 // Rota para servir vídeos
 // Usar rota simples - Express 5 não suporta sintaxe complexa
-router.get('/watch/:videoUrl', async (req, res) => {
+router.get('/watch/:videoUrl', async (req: Request, res: Response) => {
   try {
     // Pegar o videoUrl do parâmetro
     const videoUrl = req.params.videoUrl ? decodeURIComponent(req.params.videoUrl) : ''
