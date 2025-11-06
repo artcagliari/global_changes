@@ -56,8 +56,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Log IMEDIATO quando o handler é chamado
   console.log('🚀 Handler do Vercel chamado!')
   console.log(`   Método: ${req.method}`)
+  console.log(`   Método (uppercase): ${req.method?.toUpperCase()}`)
   console.log(`   URL: ${req.url}`)
   console.log(`   Query:`, JSON.stringify(req.query))
+  console.log(`   Content-Type:`, req.headers['content-type'])
+  console.log(`   Body presente:`, !!req.body)
+  console.log(`   Body tipo:`, typeof req.body)
   
   try {
     const expressApp = await getApp()
@@ -98,67 +102,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`📨 ${req.method} ${pathOnly}`)
     console.log(`   URL completa: ${fullUrl}`)
     
-    // Criar um objeto request que seja mais compatível com Express
-    // Usar req do Vercel como base mas garantir todas as propriedades necessárias
-    const expressReq = Object.create(req) as any
+    // Criar um objeto request compatível com Express
+    // IMPORTANTE: O Express precisa de um objeto que seja tratado como IncomingMessage
+    // Para rotas dinâmicas e multipart, precisamos garantir todas as propriedades
     
-    // Definir propriedades essenciais
-    Object.defineProperty(expressReq, 'url', {
-      value: fullUrl,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    })
+    const expressReq = Object.assign(Object.create(Object.getPrototypeOf(req)), req, {
+      // Garantir método HTTP correto (CRÍTICO para POST funcionar)
+      method: (req.method || 'GET').toUpperCase(),
+      // URLs e paths - ESSENCIAIS para o Express router fazer match
+      url: fullUrl,
+      originalUrl: fullUrl,
+      path: pathOnly,
+      baseUrl: '',
+      // Query e params (params será preenchido pelo Express router para rotas dinâmicas)
+      query: req.query || {},
+      params: {},
+      // Headers preservados
+      headers: req.headers || {},
+      // Body será parseado pelo Express ou Multer
+      // Para multipart, não devemos ter body parseado
+      body: req.headers['content-type']?.includes('multipart/form-data') ? undefined : (req.body || {}),
+      // Métodos do Express Request
+      get: function(name: string) {
+        return this.headers?.[name.toLowerCase()]
+      },
+      header: function(name: string) {
+        return this.get(name)
+      },
+      // Propriedades adicionais do Express
+      protocol: 'https',
+      secure: true,
+      hostname: req.headers?.host?.split(':')[0] || '',
+      ip: req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || req.headers?.['x-real-ip'] || '',
+      // Stream properties (importante para Multer processar multipart)
+      readable: true,
+      readableEnded: false,
+      // Preservar outras propriedades
+      cookies: req.cookies || {},
+      // Para compatibilidade com IncomingMessage
+      socket: null,
+      httpVersion: '1.1',
+      httpVersionMajor: 1,
+      httpVersionMinor: 1,
+      rawHeaders: req.headers ? Object.entries(req.headers).flat() : [],
+      rawTrailers: []
+    }) as any
     
-    Object.defineProperty(expressReq, 'originalUrl', {
-      value: fullUrl,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    })
-    
-    Object.defineProperty(expressReq, 'path', {
-      value: pathOnly,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    })
-    
-    Object.defineProperty(expressReq, 'baseUrl', {
-      value: '',
-      writable: true,
-      enumerable: true,
-      configurable: true
-    })
-    
-    // Garantir método
-    if (!expressReq.method) {
-      expressReq.method = req.method || 'GET'
-    }
-    
-    // Garantir query
-    if (!expressReq.query) {
-      expressReq.query = req.query || {}
-    }
-    
-    // Params será preenchido pelo Express router
-    if (!expressReq.params) {
-      expressReq.params = {}
-    }
-    
-    // Métodos do Express Request
-    expressReq.get = function(name: string) {
-      return this.headers?.[name.toLowerCase()]
-    }
-    
-    expressReq.header = function(name: string) {
-      return this.get(name)
-    }
-    
-    // Para multipart, remover body parseado
+    // Para multipart, garantir que body não esteja parseado e que o request seja tratado como stream
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
+      // Garantir que o request seja tratado como stream para Multer
+      expressReq.readable = true
+      expressReq.readableEnded = false
       console.log('   Multipart detectado - body removido para Multer')
+      console.log('   Content-Type:', req.headers['content-type'])
     }
     
     console.log('🔧 Express Request configurado:')
@@ -199,10 +196,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return result
       }
       
+      // Log final antes de passar para Express
+      console.log('🚀 Passando para Express:')
+      console.log(`   method: ${expressReq.method}`)
+      console.log(`   path: ${expressReq.path}`)
+      console.log(`   url: ${expressReq.url}`)
+      console.log(`   originalUrl: ${expressReq.originalUrl}`)
+      
       // Chamar Express app diretamente
+      // O Express processará o request e chamará a rota correspondente
       expressApp(expressReq, res, (err?: any) => {
         if (err) {
           console.error('❌ Erro no Express:', err.message)
+          console.error('   Stack:', err.stack)
           if (!res.headersSent) {
             try {
               res.status(500).json({
@@ -218,10 +224,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Se não houve erro mas resposta não foi enviada, rota não encontrada
           if (!res.headersSent) {
             console.error('❌ Rota não encontrada pelo Express!')
-            console.error(`   Método: ${req.method}`)
-            console.error(`   Path: ${pathOnly}`)
-            console.error(`   expressReq.url: ${expressReq.url}`)
-            console.error(`   expressReq.path: ${expressReq.path}`)
+            console.error(`   Método recebido: ${req.method}`)
+            console.error(`   Método no expressReq: ${expressReq.method}`)
+            console.error(`   Path recebido: ${pathOnly}`)
+            console.error(`   Path no expressReq: ${expressReq.path}`)
+            console.error(`   URL no expressReq: ${expressReq.url}`)
+            console.error(`   originalUrl no expressReq: ${expressReq.originalUrl}`)
+            console.error(`   Params:`, expressReq.params)
+            console.error(`   Query:`, expressReq.query)
+            
+            // Tentar listar rotas registradas (para debug)
+            try {
+              const routes = (expressApp as any)._router?.stack || []
+              console.error('📋 Rotas registradas no Express:')
+              routes.forEach((layer: any, idx: number) => {
+                if (layer.route) {
+                  console.error(`   ${layer.route.methods} ${layer.route.path}`)
+                } else if (layer.name === 'router') {
+                  console.error(`   Router montado em: ${layer.regexp}`)
+                }
+              })
+            } catch (routesError) {
+              console.error('   Não foi possível listar rotas:', routesError)
+            }
             
             res.status(404).json({
               error: 'Rota não encontrada',
@@ -230,9 +255,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               debug: {
                 reqUrl: req.url,
                 expressReqPath: expressReq.path,
-                expressReqUrl: expressReq.url
+                expressReqUrl: expressReq.url,
+                expressReqMethod: expressReq.method
               }
             })
+          } else {
+            console.log('✅ Resposta enviada pelo Express')
           }
           finish()
         }
