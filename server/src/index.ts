@@ -112,12 +112,18 @@ app.use((req, res, next) => {
     req.originalUrl = req.url
   }
   
+  // Garantir que o método HTTP esteja correto
+  if (req.method) {
+    req.method = req.method.toUpperCase()
+  }
+  
   // Log detalhado no Vercel
   if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
     console.log(`🔍 Express Middleware: ${req.method} ${req.path}`)
     console.log(`   url: ${req.url}`)
     console.log(`   originalUrl: ${req.originalUrl}`)
     console.log(`   baseUrl: ${req.baseUrl}`)
+    console.log(`   params:`, req.params)
   }
   
   next()

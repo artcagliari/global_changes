@@ -68,15 +68,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('✅ Express app obtido')
     
     // Extrair path do URL
+    // No Vercel com [...], o path pode vir de várias formas:
+    // 1. req.url diretamente (mais comum)
+    // 2. req.query como objeto {0: 'api', 1: 'users', 2: 'id123'}
+    
     let path = req.url || ''
     
     console.log('🔍 DEBUG Vercel Request:')
     console.log(`   req.url original: ${req.url}`)
     console.log(`   req.method: ${req.method}`)
+    console.log(`   req.query keys:`, Object.keys(req.query || {}))
     
-    // Se não tiver URL, construir a partir do query (quando usa [...])
-    if (!path || path === '/') {
+    // Se req.url não tiver path útil, tentar construir do query (quando usa [...])
+    if (!path || path === '/' || (!path.startsWith('/api') && !path.startsWith('/'))) {
       if (req.query && Object.keys(req.query).length > 0) {
+        // Verificar se é um catch-all route (query com índices numéricos)
         const segments: string[] = []
         let i = 0
         while (req.query[String(i)]) {
@@ -86,18 +92,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (segments.length > 0) {
           path = '/' + segments.join('/')
           console.log(`   Path construído do query: ${path}`)
+        } else {
+          // Se não for catch-all, pode ser query string normal
+          // Manter o path original
+          path = req.url || '/'
         }
       }
     }
     
     // Garantir que comece com /api
+    // IMPORTANTE: No Vercel, o handler já recebe /api no path
+    // Mas vamos garantir que sempre tenha /api
     if (!path.startsWith('/api')) {
-      path = '/api' + (path.startsWith('/') ? path : '/' + path)
+      if (path.startsWith('/')) {
+        path = '/api' + path
+      } else {
+        path = '/api/' + path
+      }
     }
     
     // Separar path e query string
     const [pathOnly] = path.split('?')
-    const fullUrl = path
+    // Manter query string se existir
+    const queryString = path.includes('?') ? '?' + path.split('?')[1] : ''
+    const fullUrl = pathOnly + queryString
     
     console.log(`📨 ${req.method} ${pathOnly}`)
     console.log(`   URL completa: ${fullUrl}`)
