@@ -1,6 +1,5 @@
 // Vercel Serverless Function - Catch-all route para Express
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { IncomingMessage, ServerResponse } from 'http'
 
 let app: any = null
 
@@ -34,10 +33,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // Construir path - no Vercel com catch-all, o path vem em req.query
+    // Construir path
     let path = req.url || '/'
     
-    // Se req.url não tiver path, construir do query (catch-all)
+    // Se não tiver path, construir do query (catch-all do Vercel)
     if (!path || path === '/') {
       const segments: string[] = []
       if (req.query) {
@@ -52,41 +51,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
-    // Garantir que comece com /api
+    // Garantir /api no início
     if (!path.startsWith('/api')) {
       path = '/api' + (path.startsWith('/') ? path : '/' + path)
     }
     
     const pathOnly = path.split('?')[0]
     
-    // Criar um IncomingMessage-like object para o Express
-    const expressReq = new IncomingMessage(req.socket as any) as any
+    // Criar request object compatível
+    const expressReq: any = {
+      ...req,
+      method: (req.method || 'GET').toUpperCase(),
+      url: path,
+      originalUrl: path,
+      path: pathOnly,
+      baseUrl: '',
+      query: req.query || {},
+      params: {},
+      get: (name: string) => req.headers?.[name.toLowerCase()],
+      header: (name: string) => req.headers?.[name.toLowerCase()],
+      protocol: 'https',
+      secure: true,
+      hostname: req.headers?.host?.split(':')[0] || '',
+      ip: req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || ''
+    }
     
-    // Copiar propriedades essenciais do VercelRequest
-    expressReq.method = (req.method || 'GET').toUpperCase()
-    expressReq.url = path
-    expressReq.originalUrl = path
-    expressReq.path = pathOnly
-    expressReq.query = req.query || {}
-    expressReq.params = {}
-    expressReq.headers = req.headers || {}
-    expressReq.body = req.body
-    
-    // Para multipart, remover body
+    // Para multipart, remover body para o Multer processar
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
     }
-    
-    // Métodos do Express Request
-    expressReq.get = function(name: string) {
-      return this.headers?.[name.toLowerCase()]
-    }
-    expressReq.header = expressReq.get
-    expressReq.baseUrl = ''
-    expressReq.protocol = 'https'
-    expressReq.secure = true
-    expressReq.hostname = req.headers?.host?.split(':')[0] || ''
-    expressReq.ip = req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || ''
     
     // Processar no Express
     return new Promise<void>((resolve) => {
@@ -118,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return originalSend.call(this, body)
       }
       
-      // Chamar Express
+      // Chamar Express app
       expressApp(expressReq, res as any, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
@@ -127,11 +120,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
           finish()
         } else if (!res.headersSent) {
+          // Rota não encontrada
           console.error(`404: ${req.method} ${pathOnly}`)
           res.status(404).json({ 
             error: 'Rota não encontrada',
             method: req.method,
-            path: pathOnly
+            path: pathOnly,
+            url: req.url
           })
           finish()
         } else {
@@ -139,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       })
       
-      // Timeout
+      // Timeout de segurança
       setTimeout(() => {
         if (!finished && !res.headersSent) {
           res.status(504).json({ error: 'Timeout' })
