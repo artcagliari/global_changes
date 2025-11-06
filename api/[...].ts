@@ -72,11 +72,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'https',
       secure: true,
       hostname: (typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '') || '',
-      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || ''
+      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || '',
+      body: req.body // Passar body parseado pelo Vercel
     })
     
     // Para multipart, remover body para o Multer processar o stream raw
-    // Para outros tipos, deixar o Express processar através dos middlewares
     if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
     }
