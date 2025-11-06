@@ -30,15 +30,10 @@ async function getApp() {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log(`🚀 Handler chamado: ${req.method} ${req.url}`)
-  console.log(`   Query:`, JSON.stringify(req.query))
-  console.log(`   Headers:`, JSON.stringify(req.headers))
-  
   try {
     const expressApp = await getApp()
     
     // Construir path do query (catch-all do Vercel)
-    // O Vercel passa os segmentos do path como query params: {0: 'api', 1: 'videos', 2: 'upload'}
     let path = '/api'
     const segments: string[] = []
     
@@ -53,7 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (segments.length > 0) {
       path = '/' + segments.join('/')
     } else if (req.url) {
-      // Fallback: usar req.url se disponível
       path = req.url.startsWith('/') ? req.url : '/' + req.url
     }
     
@@ -63,9 +57,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const pathOnly = path.split('?')[0]
-    console.log(`   Path construído: ${pathOnly}`)
-    console.log(`   Segments:`, segments)
-    console.log(`   Content-Type: ${req.headers['content-type']}`)
     
     // Criar request object compatível
     const expressReq: any = {
@@ -121,7 +112,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       
       // Chamar Express app
-      console.log(`   Passando para Express: ${expressReq.method} ${expressReq.path}`)
       expressApp(expressReq, res as any, (err?: any) => {
         if (err) {
           console.error('Erro no Express:', err.message)
@@ -130,13 +120,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
           finish()
         } else if (!res.headersSent) {
-          // Rota não encontrada
-          console.error(`404: ${req.method} ${pathOnly}`)
           res.status(404).json({ 
             error: 'Rota não encontrada',
             method: req.method,
-            path: pathOnly,
-            url: req.url
+            path: pathOnly
           })
           finish()
         } else {
@@ -154,8 +141,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   } catch (error: any) {
     console.error('Erro no handler:', error.message)
+    console.error('Stack:', error.stack)
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Erro ao processar requisição' })
+      res.status(500).json({ 
+        error: 'Erro ao processar requisição',
+        message: error.message 
+      })
     }
   }
 }
