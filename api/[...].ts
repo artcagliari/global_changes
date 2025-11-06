@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const pathOnly = path.split('?')[0]
     
-    // Criar request object compatível
+    // Criar request object compatível - simplificado e robusto
     const expressReq: any = Object.assign({}, req, {
       method: (req.method || 'GET').toUpperCase(),
       url: path,
@@ -67,24 +67,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       baseUrl: '',
       query: req.query || {},
       params: {},
-      get: (name: string) => req.headers?.[name.toLowerCase()],
-      header: (name: string) => req.headers?.[name.toLowerCase()],
+      get: (name: string) => {
+        const header = req.headers?.[name.toLowerCase()]
+        return typeof header === 'string' ? header : undefined
+      },
+      header: (name: string) => {
+        const header = req.headers?.[name.toLowerCase()]
+        return typeof header === 'string' ? header : undefined
+      },
       protocol: 'https',
       secure: true,
       hostname: (typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '') || '',
-      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || ''
+      ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || '',
+      body: req.body || undefined // Passar body se existir
     })
     
-    // Para multipart, remover body para o Multer processar o stream raw
-    // Para JSON, passar o body parseado pelo Vercel (ou deixar o Express processar)
-    const contentType = typeof req.headers['content-type'] === 'string' ? req.headers['content-type'] : ''
-    if (contentType.includes('multipart/form-data')) {
+    // Para multipart, remover body para o Multer processar
+    const contentType = req.headers['content-type']
+    if (typeof contentType === 'string' && contentType.includes('multipart/form-data')) {
       delete expressReq.body
-    } else if (req.body) {
-      // Se o Vercel já parseou o body, passar diretamente
-      expressReq.body = req.body
     }
-    // Se não houver body parseado pelo Vercel, o Express vai processar através dos middlewares
     
     // Processar no Express
     return new Promise<void>((resolve) => {
