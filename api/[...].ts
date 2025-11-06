@@ -31,26 +31,30 @@ async function getApp() {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log(`🚀 Handler chamado: ${req.method} ${req.url}`)
+  console.log(`   Query:`, JSON.stringify(req.query))
+  console.log(`   Headers:`, JSON.stringify(req.headers))
+  
   try {
     const expressApp = await getApp()
     
-    // Construir path
-    let path = req.url || '/'
-    console.log(`   Path original: ${path}`)
+    // Construir path do query (catch-all do Vercel)
+    // O Vercel passa os segmentos do path como query params: {0: 'api', 1: 'videos', 2: 'upload'}
+    let path = '/api'
+    const segments: string[] = []
     
-    // Se não tiver path, construir do query (catch-all do Vercel)
-    if (!path || path === '/') {
-      const segments: string[] = []
-      if (req.query) {
-        let i = 0
-        while (req.query[String(i)] !== undefined) {
-          segments.push(String(req.query[String(i)]))
-          i++
-        }
+    if (req.query) {
+      let i = 0
+      while (req.query[String(i)] !== undefined) {
+        segments.push(String(req.query[String(i)]))
+        i++
       }
-      if (segments.length > 0) {
-        path = '/' + segments.join('/')
-      }
+    }
+    
+    if (segments.length > 0) {
+      path = '/' + segments.join('/')
+    } else if (req.url) {
+      // Fallback: usar req.url se disponível
+      path = req.url.startsWith('/') ? req.url : '/' + req.url
     }
     
     // Garantir /api no início
@@ -59,7 +63,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const pathOnly = path.split('?')[0]
-    console.log(`   Path final: ${pathOnly}`)
+    console.log(`   Path construído: ${pathOnly}`)
+    console.log(`   Segments:`, segments)
     console.log(`   Content-Type: ${req.headers['content-type']}`)
     
     // Criar request object compatível
