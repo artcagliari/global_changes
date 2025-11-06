@@ -38,35 +38,24 @@ const Upload = () => {
       let videoUrl: string
 
       if (isProduction) {
-        // Upload via rota /api/upload-blob
-        console.log('📤 Fazendo upload para Vercel Blob...')
+        // Upload direto para Vercel Blob usando SDK do cliente
+        console.log('📤 Fazendo upload direto para Vercel Blob...')
         
-        const formData = new FormData()
-        formData.append('file', file)
+        // Usar SDK do Vercel Blob diretamente no frontend
+        const { put } = await import('@vercel/blob')
         
-        // Usar API_URL para garantir que está usando a URL correta
-        const uploadUrl = API_URL ? `${API_URL}/api/upload-blob` : '/api/upload-blob'
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        const ext = file.name.includes('.') ? file.name.split('.').pop() : 'mp4'
+        const fileName = `videos/video-${uniqueSuffix}.${ext}`
         
-        console.log('📡 Fazendo requisição para:', uploadUrl)
-        console.log('📦 Arquivo:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`)
-        console.log('📋 Content-Type:', file.type)
+        console.log('📦 Uploading:', fileName, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`)
         
-        const blobResponse = await fetch(uploadUrl, {
-          method: 'POST',
-          body: formData,
-          // Não adicionar Content-Type - o browser define automaticamente com boundary
+        const blob = await put(fileName, file, {
+          access: 'public',
+          contentType: file.type || 'video/mp4',
         })
         
-        console.log('📥 Resposta:', blobResponse.status, blobResponse.statusText)
-        
-        if (!blobResponse.ok) {
-          const errorData = await blobResponse.json().catch(() => ({}))
-          console.error('❌ Erro no upload:', errorData)
-          throw new Error(errorData.message || errorData.error || `Erro ${blobResponse.status}: Erro ao fazer upload para Blob Storage`)
-        }
-        
-        const blobData = await blobResponse.json()
-        videoUrl = blobData.url
+        videoUrl = blob.url
         console.log('✅ Upload para Blob concluído:', videoUrl)
       } else {
         // Em desenvolvimento, usar o fluxo normal
