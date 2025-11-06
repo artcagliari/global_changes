@@ -75,13 +75,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ip: (typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '') || ''
     })
     
-    // Para multipart, remover body para o Multer processar o stream
-    // Para JSON, preservar o body parseado pelo Vercel
-    const contentType = req.headers['content-type'] || ''
-    if (contentType.includes('multipart/form-data')) {
+    // Para multipart, remover body para o Multer processar o stream raw
+    // Para outros tipos, deixar o Express processar através dos middlewares
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
-    } else if (contentType.includes('application/json') && req.body) {
-      expressReq.body = req.body
     }
     
     // Processar no Express
