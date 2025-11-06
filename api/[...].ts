@@ -76,13 +76,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
     
     // Para multipart, remover body para o Multer processar o stream raw
-    // Para JSON, passar o body parseado pelo Vercel
+    // Para JSON, passar o body parseado pelo Vercel (ou deixar o Express processar)
     const contentType = typeof req.headers['content-type'] === 'string' ? req.headers['content-type'] : ''
     if (contentType.includes('multipart/form-data')) {
       delete expressReq.body
-    } else if (req.body && contentType.includes('application/json')) {
+    } else if (req.body) {
+      // Se o Vercel já parseou o body, passar diretamente
       expressReq.body = req.body
     }
+    // Se não houver body parseado pelo Vercel, o Express vai processar através dos middlewares
     
     // Processar no Express
     return new Promise<void>((resolve) => {
