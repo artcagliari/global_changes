@@ -73,7 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'https',
       secure: true,
       hostname: req.headers?.host?.split(':')[0] || '',
-      ip: req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || ''
+      ip: req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || '',
+      body: req.body // Garantir que o body seja passado
     }
     
     // Para multipart, remover body para o Multer processar
