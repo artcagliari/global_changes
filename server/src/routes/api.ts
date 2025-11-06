@@ -103,26 +103,34 @@ router.get('/users/:id', async (req, res) => {
 // Criar usuário
 router.post('/users', async (req, res) => {
   try {
+    console.log('📝 Recebendo requisição de criação de usuário')
+    console.log('   Body:', JSON.stringify(req.body, null, 2))
+    
     const { name, email, role, points = 0 } = req.body
     
     // Validações
     if (!name || !name.trim()) {
+      console.log('❌ Validação falhou: Nome é obrigatório')
       return res.status(400).json({ error: 'Nome é obrigatório' })
     }
     
     if (!email || !email.trim()) {
+      console.log('❌ Validação falhou: Email é obrigatório')
       return res.status(400).json({ error: 'Email é obrigatório' })
     }
     
     // Verificar se email já existe
+    console.log('🔍 Verificando se email já existe:', email.trim().toLowerCase())
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.trim() }
+      where: { email: email.trim().toLowerCase() }
     })
     
     if (existingUser) {
+      console.log('❌ Email já existe:', email)
       return res.status(409).json({ error: 'Este email já está em uso' })
     }
     
+    console.log('💾 Criando usuário no banco de dados...')
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -132,13 +140,18 @@ router.post('/users', async (req, res) => {
       }
     })
 
+    console.log('✅ Usuário criado com sucesso:', user.id, user.email)
     res.json(user)
   } catch (error: any) {
-    console.error('Erro ao criar usuário:', error)
+    console.error('❌ Erro ao criar usuário:', error)
+    console.error('   Detalhes:', JSON.stringify(error, null, 2))
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Este email já está em uso' })
     }
-    res.status(500).json({ error: 'Erro ao criar usuário' })
+    res.status(500).json({ 
+      error: 'Erro ao criar usuário',
+      message: error.message 
+    })
   }
 })
 
