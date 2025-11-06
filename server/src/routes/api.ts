@@ -93,10 +93,9 @@ router.get('/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' })
     }
     
-    console.log(`✅ Usuário encontrado: ${user.email}`)
     res.json(user)
   } catch (error: any) {
-    console.error('❌ Erro ao buscar usuário:', error)
+    console.error('Erro ao buscar usuário:', error.message)
     res.status(500).json({ error: 'Failed to fetch user', message: error.message })
   }
 })
