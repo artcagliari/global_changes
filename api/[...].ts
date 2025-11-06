@@ -59,8 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const pathOnly = path.split('?')[0]
     
     // Criar request object compatível
-    const expressReq: any = {
-      ...req,
+    // IMPORTANTE: Preservar o body do VercelRequest
+    const expressReq: any = Object.assign({}, req, {
       method: (req.method || 'GET').toUpperCase(),
       url: path,
       originalUrl: path,
@@ -73,12 +73,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'https',
       secure: true,
       hostname: req.headers?.host?.split(':')[0] || '',
-      ip: req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || ''
-    }
+      ip: req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || '',
+      body: req.body // Preservar body do Vercel (já parseado se for JSON)
+    })
     
-    // Garantir que body seja passado (Vercel já faz parse do JSON)
-    if (req.body && !req.headers['content-type']?.includes('multipart/form-data')) {
-      expressReq.body = req.body
+    // Para multipart, remover body para o Multer processar o stream
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
+      delete expressReq.body
     }
     
     // Processar no Express
