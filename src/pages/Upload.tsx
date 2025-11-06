@@ -38,24 +38,34 @@ const Upload = () => {
       let videoUrl: string
 
       if (isProduction) {
-        // Upload direto para Vercel Blob usando SDK do cliente
-        console.log('📤 Fazendo upload direto para Vercel Blob...')
-        
-        // Usar SDK do Vercel Blob diretamente no frontend
-        const { put } = await import('@vercel/blob')
+        // Upload via rota /api/upload que usa o token do servidor
+        console.log('📤 Fazendo upload para Vercel Blob via /api/upload...')
         
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
         const ext = file.name.includes('.') ? file.name.split('.').pop() : 'mp4'
         const fileName = `videos/video-${uniqueSuffix}.${ext}`
         
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('filename', fileName)
+        formData.append('contentType', file.type || 'video/mp4')
+        
+        const uploadUrl = API_URL ? `${API_URL}/api/upload?filename=${encodeURIComponent(fileName)}` : `/api/upload?filename=${encodeURIComponent(fileName)}`
+        
         console.log('📦 Uploading:', fileName, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`)
         
-        const blob = await put(fileName, file, {
-          access: 'public',
-          contentType: file.type || 'video/mp4',
+        const blobResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          body: formData,
         })
         
-        videoUrl = blob.url
+        if (!blobResponse.ok) {
+          const errorData = await blobResponse.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || `Erro ${blobResponse.status}`)
+        }
+        
+        const blobData = await blobResponse.json()
+        videoUrl = blobData.url
         console.log('✅ Upload para Blob concluído:', videoUrl)
       } else {
         // Em desenvolvimento, usar o fluxo normal
