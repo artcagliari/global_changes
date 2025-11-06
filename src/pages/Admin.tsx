@@ -490,7 +490,14 @@ const Admin = () => {
                   background: '#000'
                 }}
               >
-                <source src={`${API_URL}/api/videos/watch/${encodeURIComponent(selectedVideo)}`} type="video/mp4" />
+                <source 
+                  src={
+                    selectedVideo.startsWith('http://') || selectedVideo.startsWith('https://')
+                      ? selectedVideo
+                      : `${API_URL}/api/videos/watch/${encodeURIComponent(selectedVideo)}`
+                  } 
+                  type="video/mp4" 
+                />
                 Seu navegador não suporta a reprodução de vídeos.
               </video>
             </div>

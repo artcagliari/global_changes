@@ -41,6 +41,15 @@ https://seu-projeto.vercel.app
 - Substitua `seu-projeto` pela URL real do seu projeto
 - O Vercel também fornece `VERCEL_URL` automaticamente
 
+#### `BLOB_READ_WRITE_TOKEN` (Obrigatório para Upload de Vídeos)
+```
+vercel_blob_rw_h8TXpLMkzLdnNvRf_5GhRho9t2o44e4tZkAWWuZb3njUi9c
+```
+- **Environment**: Production, Preview, Development (marque todos)
+- **Apply to**: All environments
+- Este token é necessário para fazer upload de vídeos para o Vercel Blob Storage
+- Sem este token, uploads de vídeos falharão na produção
+
 ### 3. Fazer Deploy
 
 1. Vá em **Deployments**
@@ -59,4 +68,5 @@ Após o deploy, teste:
 ## 🎉 Pronto!
 
 Seu projeto está configurado e todos os dados foram preservados!
+
 

@@ -3,6 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+import { put } from '@vercel/blob'
 import { prisma } from '../lib/prisma.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -66,12 +67,28 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     let videoUrl: string
 
     if (isVercel && req.file.buffer) {
-      // Em Vercel, apenas gerar nome único
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-      const ext = path.extname(req.file.originalname || '.mp4')
-      videoUrl = `video-${uniqueSuffix}${ext}`
+      // Em Vercel, fazer upload para o Blob Storage
+      try {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        const ext = path.extname(req.file.originalname || '.mp4')
+        const fileName = `videos/video-${uniqueSuffix}${ext}`
+        
+        console.log('📤 Fazendo upload para Vercel Blob:', fileName)
+        console.log('   Tamanho do arquivo:', (req.file.buffer.length / 1024 / 1024).toFixed(2), 'MB')
+        
+        const blob = await put(fileName, req.file.buffer, {
+          access: 'public',
+          contentType: req.file.mimetype || 'video/mp4',
+        })
+        
+        videoUrl = blob.url
+        console.log('✅ Upload para Blob concluído:', videoUrl)
+      } catch (blobError: any) {
+        console.error('❌ Erro ao fazer upload para Blob:', blobError)
+        throw new Error(`Erro ao fazer upload para armazenamento: ${blobError.message}`)
+      }
     } else {
-      // Em desenvolvimento, usar nome do arquivo
+      // Em desenvolvimento, usar nome do arquivo salvo localmente
       videoUrl = req.file.filename
     }
 
@@ -87,7 +104,8 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     res.status(200).json({ 
       message: 'Vídeo enviado com sucesso!', 
       fileName: videoUrl,
-      submissionId: submission.id
+      submissionId: submission.id,
+      videoUrl: videoUrl
     })
   } catch (error: any) {
     console.error('Erro no upload:', error.message)
@@ -98,10 +116,15 @@ router.post('/upload', upload.single('video'), async (req, res) => {
   }
 })
 
-// Rota para servir vídeos (apenas em desenvolvimento)
+// Rota para servir vídeos
 router.get('/watch/:videoUrl(*)', async (req, res) => {
   try {
     const videoUrl = decodeURIComponent(req.params.videoUrl)
+    
+    // Se a URL já é uma URL completa (do Blob), redirecionar diretamente
+    if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
+      return res.redirect(videoUrl)
+    }
     
     // Em desenvolvimento, servir do disco
     if (!isVercel) {
@@ -112,7 +135,21 @@ router.get('/watch/:videoUrl(*)', async (req, res) => {
         res.status(404).json({ error: 'Vídeo não encontrado' })
       }
     } else {
-      res.status(404).json({ error: 'Vídeo não disponível em produção' })
+      // Em produção, se não for uma URL completa, tentar buscar no banco
+      // e redirecionar para a URL do Blob
+      const submission = await prisma.submission.findFirst({
+        where: {
+          videoUrl: {
+            contains: videoUrl
+          }
+        }
+      })
+      
+      if (submission && submission.videoUrl && (submission.videoUrl.startsWith('http://') || submission.videoUrl.startsWith('https://'))) {
+        return res.redirect(submission.videoUrl)
+      }
+      
+      res.status(404).json({ error: 'Vídeo não encontrado' })
     }
   } catch (error: any) {
     console.error('Erro ao servir vídeo:', error.message)
