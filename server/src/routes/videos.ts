@@ -44,10 +44,16 @@ if (isVercel) {
 }
 
 router.post('/upload', upload.single('video'), async (req, res) => {
+  console.log('📹 Rota /upload chamada!')
+  console.log('   Método:', req.method)
+  console.log('   Path:', req.path)
+  console.log('   URL:', req.url)
   try {
     if (!req.file) {
+      console.log('   Nenhum arquivo recebido')
       return res.status(400).json({ message: 'Nenhum arquivo de vídeo enviado.' })
     }
+    console.log('   Arquivo recebido:', req.file.originalname)
 
     const { userId } = req.body
     if (!userId) {

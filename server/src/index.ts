@@ -89,6 +89,14 @@ app.use((req, res, next) => {
 app.use('/api/videos', videoRoutes)
 app.use('/api', apiRoutes)
 
+// Log de rotas registradas (apenas no Vercel)
+if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {
+  console.log('✅ Rotas registradas:')
+  console.log('   POST /api/videos/upload')
+  console.log('   POST /api/login')
+  console.log('   GET /api/users/:id')
+}
+
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ 
