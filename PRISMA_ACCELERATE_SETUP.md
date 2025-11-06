@@ -77,3 +77,6 @@ Se você ver:
 
 Isso significa que a extensão não está instalada, mas o sistema continuará funcionando normalmente com PostgreSQL direto.
 
+
+
+

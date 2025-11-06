@@ -12,10 +12,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "seed": "ts-node-esm prisma/seed.ts",
-    "test:blob": "ts-node-esm test-blob-upload.ts",
-    "test:register": "ts-node-esm test-register.ts",
-    "test:upload": "ts-node-esm test-upload.ts"
+    "seed": "ts-node-esm prisma/seed.ts"
   },
   "keywords": [],
   "author": "",
@@ -32,7 +29,6 @@
     "@vercel/blob": "^2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "form-data": "^4.0.4",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "nodemon": "^3.1.10",

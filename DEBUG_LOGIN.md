@@ -97,3 +97,6 @@ A rota `/api/login` deve estar sendo capturada pelo `api/[...].ts`.
 2. Compartilhe o erro do console do navegador
 3. Verifique se o DATABASE_URL está correto
 
+
+
+

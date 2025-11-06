@@ -3,7 +3,6 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { put } from '@vercel/blob'
 import { prisma } from '../lib/prisma.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -46,35 +45,22 @@ if (isVercel) {
 
 router.post('/upload', upload.single('video'), async (req, res) => {
   try {
-    console.log('📤 Recebendo requisição de upload de vídeo')
-    console.log('   File recebido:', req.file ? 'Sim' : 'Não')
-    console.log('   Body:', JSON.stringify(req.body, null, 2))
-    
     if (!req.file) {
-      console.log('❌ Nenhum arquivo enviado')
       return res.status(400).json({ message: 'Nenhum arquivo de vídeo enviado.' })
     }
 
-    console.log('   Arquivo:', req.file.originalname, `(${(req.file.size / 1024 / 1024).toFixed(2)} MB)`)
-    console.log('   MIME type:', req.file.mimetype)
-
     const { userId } = req.body
     if (!userId) {
-      console.log('❌ userId não fornecido')
       return res.status(400).json({ message: 'ID do usuário é obrigatório.' })
     }
 
-    console.log('🔍 Verificando usuário:', userId)
     const user = await prisma.user.findUnique({
       where: { id: userId }
     })
 
     if (!user) {
-      console.log('❌ Usuário não encontrado:', userId)
       return res.status(404).json({ message: 'Usuário não encontrado.' })
     }
-    
-    console.log('✅ Usuário encontrado:', user.name, user.email)
 
     // Gerar URL do vídeo
     let videoUrl: string
@@ -82,19 +68,12 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     if (isVercel && req.file.buffer) {
       // Em Vercel, fazer upload para o Blob Storage
       try {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-      const ext = path.extname(req.file.originalname || '.mp4')
+        // Import dinâmico do Blob apenas quando necessário
+        const { put } = await import('@vercel/blob')
+        
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        const ext = path.extname(req.file.originalname || '.mp4')
         const fileName = `videos/video-${uniqueSuffix}${ext}`
-        
-        console.log('📤 Fazendo upload para Vercel Blob:', fileName)
-        console.log('   Tamanho do arquivo:', (req.file.buffer.length / 1024 / 1024).toFixed(2), 'MB')
-        console.log('   Token configurado:', process.env.BLOB_READ_WRITE_TOKEN ? 'Sim' : 'Não')
-        
-        // O Vercel Blob detecta automaticamente BLOB_READ_WRITE_TOKEN do ambiente
-        // Não precisa passar explicitamente, mas verificamos se está configurado
-        if (!process.env.BLOB_READ_WRITE_TOKEN) {
-          console.warn('⚠️  BLOB_READ_WRITE_TOKEN não configurado! O upload pode falhar.')
-        }
         
         const blob = await put(fileName, req.file.buffer, {
           access: 'public',
@@ -102,10 +81,8 @@ router.post('/upload', upload.single('video'), async (req, res) => {
         })
         
         videoUrl = blob.url
-        console.log('✅ Upload para Blob concluído:', videoUrl)
       } catch (blobError: any) {
-        console.error('❌ Erro ao fazer upload para Blob:', blobError)
-        console.error('   Detalhes:', JSON.stringify(blobError, null, 2))
+        console.error('Erro ao fazer upload para Blob:', blobError)
         throw new Error(`Erro ao fazer upload para armazenamento: ${blobError.message}`)
       }
     } else {
@@ -114,19 +91,13 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     }
 
     // Criar submissão
-    console.log('💾 Salvando submissão no banco de dados...')
-    console.log('   userId:', userId)
-    console.log('   videoUrl:', videoUrl)
-    
     const submission = await prisma.submission.create({
       data: {
         userId: userId,
         videoUrl: videoUrl,
-        status: 'PENDING'
+        status: 'pending'
       }
     })
-
-    console.log('✅ Submissão criada com sucesso:', submission.id)
 
     res.status(200).json({ 
       message: 'Vídeo enviado com sucesso!', 

@@ -137,3 +137,6 @@ E continue usando SQLite localmente.
 - Confirme que o `dev.db` tem dados
 - Verifique no Prisma Studio
 
+
+
+

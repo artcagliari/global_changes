@@ -103,34 +103,26 @@ router.get('/users/:id', async (req, res) => {
 // Criar usuário
 router.post('/users', async (req, res) => {
   try {
-    console.log('📝 Recebendo requisição de criação de usuário')
-    console.log('   Body:', JSON.stringify(req.body, null, 2))
-    
     const { name, email, role, points = 0 } = req.body
     
     // Validações
     if (!name || !name.trim()) {
-      console.log('❌ Validação falhou: Nome é obrigatório')
       return res.status(400).json({ error: 'Nome é obrigatório' })
     }
     
     if (!email || !email.trim()) {
-      console.log('❌ Validação falhou: Email é obrigatório')
       return res.status(400).json({ error: 'Email é obrigatório' })
     }
     
     // Verificar se email já existe
-    console.log('🔍 Verificando se email já existe:', email.trim().toLowerCase())
     const existingUser = await prisma.user.findUnique({
       where: { email: email.trim().toLowerCase() }
     })
     
     if (existingUser) {
-      console.log('❌ Email já existe:', email)
       return res.status(409).json({ error: 'Este email já está em uso' })
     }
     
-    console.log('💾 Criando usuário no banco de dados...')
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -140,18 +132,13 @@ router.post('/users', async (req, res) => {
       }
     })
 
-    console.log('✅ Usuário criado com sucesso:', user.id, user.email)
     res.json(user)
   } catch (error: any) {
-    console.error('❌ Erro ao criar usuário:', error)
-    console.error('   Detalhes:', JSON.stringify(error, null, 2))
+    console.error('Erro ao criar usuário:', error)
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Este email já está em uso' })
     }
-    res.status(500).json({ 
-      error: 'Erro ao criar usuário',
-      message: error.message 
-    })
+    res.status(500).json({ error: 'Erro ao criar usuário' })
   }
 })
 
@@ -444,57 +431,6 @@ router.post('/submissions', async (req, res) => {
     console.error('❌ Erro ao criar submissão:', error)
     res.status(500).json({ 
       error: 'Failed to create submission',
-      message: error.message 
-    })
-  }
-})
-
-// Criar submissão a partir de arquivo já existente no Blob
-// Útil para adicionar arquivos que foram enviados manualmente para o Blob
-router.post('/submissions/from-blob', async (req, res) => {
-  try {
-    const { userId, blobUrl } = req.body
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'ID do usuário é obrigatório' })
-    }
-    
-    if (!blobUrl) {
-      return res.status(400).json({ error: 'URL do Blob é obrigatória' })
-    }
-    
-    // Validar se é uma URL válida
-    if (!blobUrl.startsWith('http://') && !blobUrl.startsWith('https://')) {
-      return res.status(400).json({ error: 'URL do Blob deve ser uma URL completa (http:// ou https://)' })
-    }
-    
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' })
-    }
-
-    const submission = await prisma.submission.create({
-      data: {
-        userId,
-        videoUrl: blobUrl,
-        status: 'PENDING'
-      },
-      include: {
-        user: true
-      }
-    })
-
-    console.log('✅ Submissão criada a partir do Blob:', submission.id)
-    console.log('   URL do Blob:', blobUrl)
-    res.json({
-      success: true,
-      submission,
-      message: 'Arquivo do Blob adicionado ao sistema com sucesso'
-    })
-  } catch (error: any) {
-    console.error('❌ Erro ao criar submissão do Blob:', error)
-    res.status(500).json({ 
-      error: 'Erro ao criar submissão',
       message: error.message 
     })
   }

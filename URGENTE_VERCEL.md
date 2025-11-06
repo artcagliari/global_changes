@@ -44,3 +44,6 @@ Após configurar, os logs devem mostrar:
 
 **SEM DATABASE_URL CONFIGURADO, O LOGIN NÃO FUNCIONA!**
 
+
+
+

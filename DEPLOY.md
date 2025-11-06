@@ -138,3 +138,6 @@ Se encontrar problemas:
 2. Verifique se todas as variáveis de ambiente estão configuradas
 3. Certifique-se de que o banco de dados está acessível
 
+
+
+

@@ -52,3 +52,6 @@ Qualquer serviço de PostgreSQL gerenciado funciona. Siga os passos acima.
 2. Faça redeploy
 3. O erro 500 deve ser resolvido
 
+
+
+
