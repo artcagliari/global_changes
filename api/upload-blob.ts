@@ -74,20 +74,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         resolve()
       })
       
-      // Criar stream do body
+      // No Vercel, o body pode não estar disponível diretamente
+      // Precisamos acessar de forma diferente
+      let bodyStream: Readable | null = null
+      
+      // Tentar várias formas de acessar o body
       if (req.body) {
-        let bodyStream: Readable
         if (Buffer.isBuffer(req.body)) {
           bodyStream = Readable.from(req.body)
         } else if (typeof req.body === 'string') {
           bodyStream = Readable.from(Buffer.from(req.body))
-        } else {
-          return res.status(400).json({ error: 'Body inválido' })
+        } else if (req.body instanceof Uint8Array) {
+          bodyStream = Readable.from(Buffer.from(req.body))
         }
-        bodyStream.pipe(bb)
-      } else {
-        return res.status(400).json({ error: 'Body não disponível' })
       }
+      
+      // Tentar acessar rawBody se disponível
+      if (!bodyStream && (req as any).rawBody) {
+        bodyStream = Readable.from((req as any).rawBody)
+      }
+      
+      if (!bodyStream) {
+        console.error('Body não disponível. req.body type:', typeof req.body)
+        return res.status(400).json({ 
+          error: 'Body não disponível',
+          message: 'O Vercel pode não expor o body raw para multipart. Tente usar uma abordagem diferente.'
+        })
+      }
+      
+      bodyStream.pipe(bb)
     })
   } catch (error: any) {
     console.error('Erro no handler:', error)
