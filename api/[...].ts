@@ -37,6 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let path = '/api'
     const segments: string[] = []
     
+    // Pegar segments do query (catch-all do Vercel usa query params numerados)
     if (req.query) {
       let i = 0
       while (req.query[String(i)] !== undefined) {
@@ -45,15 +46,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
+    // Se não tem segments no query, tentar pegar da URL
     if (segments.length > 0) {
-      path = '/' + segments.join('/')
+      path = '/api/' + segments.join('/')
     } else if (req.url) {
-      path = req.url.startsWith('/') ? req.url : '/' + req.url
-    }
-    
-    // Garantir /api no início
-    if (!path.startsWith('/api')) {
-      path = '/api' + (path.startsWith('/') ? path : '/' + path)
+      // Remover query string se houver
+      const urlPath = req.url.split('?')[0]
+      // Se já começa com /api, usar direto, senão adicionar
+      if (urlPath.startsWith('/api')) {
+        path = urlPath
+      } else {
+        path = '/api' + (urlPath.startsWith('/') ? urlPath : '/' + urlPath)
+      }
     }
     
     const pathOnly = path.split('?')[0]

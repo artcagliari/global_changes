@@ -85,9 +85,10 @@ app.use((req, res, next) => {
 })
 
 // Rotas da API - IMPORTANTE: ordem importa!
-// Rotas mais específicas primeiro (incluindo /watch)
-app.use('/api/videos', videoRoutes)
+// Rotas de API primeiro (login, register, etc) - mais importantes
 app.use('/api', apiRoutes)
+// Depois rotas de vídeos (menos críticas)
+app.use('/api/videos', videoRoutes)
 
 // Log de rotas registradas (apenas no Vercel)
 if (process.env.VERCEL === '1' || process.env.VERCEL_URL) {

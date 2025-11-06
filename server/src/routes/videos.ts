@@ -115,10 +115,11 @@ router.post('/upload', upload.single('video'), async (req, res) => {
 })
 
 // Rota para servir vídeos
-router.get('/watch/*', async (req, res) => {
+// Usar rota simples - Express 5 não suporta sintaxe complexa
+router.get('/watch/:videoUrl', async (req, res) => {
   try {
-    // Pegar o path completo após /watch/
-    const videoUrl = req.params[0] ? decodeURIComponent(req.params[0]) : ''
+    // Pegar o videoUrl do parâmetro
+    const videoUrl = req.params.videoUrl ? decodeURIComponent(req.params.videoUrl) : ''
     
     // Se a URL já é uma URL completa (do Blob), redirecionar diretamente
     if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
