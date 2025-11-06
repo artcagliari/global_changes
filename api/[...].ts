@@ -1,5 +1,6 @@
 // Vercel Serverless Function - Catch-all route para Express
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { Readable } from 'stream'
 
 let app: any = null
 
@@ -46,8 +47,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const pathOnly = path.split('?')[0]
     
+    // Para multipart/form-data, criar um stream fake para o Multer
+    const isMultipart = req.headers['content-type']?.includes('multipart/form-data')
+    let bodyStream: Readable | undefined
+    
+    if (isMultipart && req.body) {
+      // Criar um stream a partir do body (se for Buffer ou string)
+      if (Buffer.isBuffer(req.body)) {
+        bodyStream = Readable.from(req.body)
+      } else if (typeof req.body === 'string') {
+        bodyStream = Readable.from(Buffer.from(req.body))
+      } else if (req.body instanceof Uint8Array) {
+        bodyStream = Readable.from(Buffer.from(req.body))
+      }
+    }
+    
     // Criar request object compatível
-    // No Vercel, o body já vem processado, então não precisamos de stream
     const expressReq: any = {
       method: (req.method || 'GET').toUpperCase(),
       url: path,
@@ -63,13 +78,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       secure: true,
       hostname: typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '',
       ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '',
-      // Body - passar apenas se não for multipart (no Vercel já vem processado)
-      body: req.headers['content-type']?.includes('multipart/form-data') ? undefined : req.body,
-      // Remover propriedades que podem causar conflito com stream
-      readable: false,
-      readableEnded: true,
-      readableFlowing: false,
-      readableObjectMode: false
+      // Body - para multipart, passar stream; para outros, passar body processado
+      body: isMultipart ? undefined : req.body,
+      // Para multipart, adicionar o stream
+      ...(isMultipart && bodyStream ? { 
+        pipe: bodyStream.pipe.bind(bodyStream),
+        on: bodyStream.on.bind(bodyStream),
+        readable: true,
+        readableEnded: false,
+        readableFlowing: null,
+        readableObjectMode: false
+      } : {
+        readable: false,
+        readableEnded: true,
+        readableFlowing: false,
+        readableObjectMode: false
+      })
     }
     
     // Processar no Express
