@@ -9,8 +9,14 @@ async function getApp() {
       let serverModule: any
       try {
         serverModule = await import('../server/src/index.js')
-      } catch {
-        serverModule = await import('../server/dist/index.js')
+      } catch (error1: any) {
+        // Tentar importar da build (pode não existir em dev)
+        try {
+          // @ts-ignore - dist pode não existir em dev
+          serverModule = await import('../server/dist/index.js')
+        } catch (error2: any) {
+          throw error1 // Lançar erro original
+        }
       }
       app = serverModule.default
       if (!app) {
