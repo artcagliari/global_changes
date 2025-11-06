@@ -39,27 +39,8 @@ app.use(cors({
 }))
 
 // Body parsing
-// Para JSON e URL-encoded, aplicar normalmente
-// Para multipart, o Multer vai processar depois
-app.use((req, res, next) => {
-  const contentType = req.headers['content-type'] || ''
-  if (contentType.includes('multipart/form-data')) {
-    // Para multipart, não fazer parse - Multer vai processar
-    return next()
-  }
-  // Para JSON e outros tipos, usar o parser
-  express.json({ limit: '50mb' })(req, res, (err) => {
-    if (err) {
-      return next(err)
-    }
-    // Se não for JSON, tentar URL-encoded
-    if (!contentType.includes('application/json')) {
-      express.urlencoded({ extended: true, limit: '50mb' })(req, res, next)
-    } else {
-      next()
-    }
-  })
-})
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 // Logging
 if (process.env.NODE_ENV !== 'production') {
