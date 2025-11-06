@@ -58,7 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const pathOnly = path.split('?')[0]
     
-    // Criar request object compatível - usando spread operator como estava funcionando
+    // Criar request object compatível - SEM passar body explicitamente
+    // O spread operator já passa tudo, incluindo o body parseado pelo Vercel
     const expressReq: any = {
       ...req,
       method: (req.method || 'GET').toUpperCase(),
@@ -73,12 +74,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'https',
       secure: true,
       hostname: typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '',
-      ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '',
-      body: req.body // Garantir que body seja passado explicitamente
+      ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : ''
     }
     
     // Para multipart, remover body para o Multer processar
-    if (typeof req.headers['content-type'] === 'string' && req.headers['content-type'].includes('multipart/form-data')) {
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
       delete expressReq.body
     }
     
@@ -142,12 +142,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   } catch (error: any) {
     console.error('Erro no handler:', error.message)
-    console.error('Stack:', error.stack)
     if (!res.headersSent) {
-      res.status(500).json({ 
-        error: 'Erro ao processar requisição',
-        message: error.message 
-      })
+      res.status(500).json({ error: 'Erro ao processar requisição' })
     }
   }
 }
