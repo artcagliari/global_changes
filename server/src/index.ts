@@ -38,23 +38,28 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
 
-// Body parsing - IMPORTANTE: Não aplicar para multipart/form-data
-// O Multer precisa processar o stream original
-app.use((req, res, next) => {
-  if (req.headers['content-type']?.includes('multipart/form-data')) {
-    // Para multipart, não fazer parse do body - deixar para o Multer
-    return next()
-  }
-  // Para outros tipos, usar os parsers padrão
-  express.json({ limit: '50mb' })(req, res, next)
-})
+// Body parsing - No Vercel, o body já vem processado pelo handler
+// Em desenvolvimento local, usar os parsers do Express
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
+if (!isVercel) {
+  // Body parsing - IMPORTANTE: Não aplicar para multipart/form-data
+  // O Multer precisa processar o stream original
+  app.use((req, res, next) => {
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
+      // Para multipart, não fazer parse do body - deixar para o Multer
+      return next()
+    }
+    // Para outros tipos, usar os parsers padrão
+    express.json({ limit: '50mb' })(req, res, next)
+  })
 
-app.use((req, res, next) => {
-  if (req.headers['content-type']?.includes('multipart/form-data')) {
-    return next()
-  }
-  express.urlencoded({ extended: true, limit: '50mb' })(req, res, next)
-})
+  app.use((req, res, next) => {
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
+      return next()
+    }
+    express.urlencoded({ extended: true, limit: '50mb' })(req, res, next)
+  })
+}
 
 // Logging
 if (process.env.NODE_ENV !== 'production') {
@@ -62,7 +67,6 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Arquivos estáticos (apenas em desenvolvimento)
-const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
 if (!isVercel) {
   app.use('/uploads/videos', express.static(path.join(__dirname, '../uploads/videos')))
 }

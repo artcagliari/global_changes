@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const pathOnly = path.split('?')[0]
     
     // Criar request object compatível
+    // No Vercel, o body já vem processado, então não precisamos de stream
     const expressReq: any = {
       method: (req.method || 'GET').toUpperCase(),
       url: path,
@@ -62,8 +63,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       secure: true,
       hostname: typeof req.headers?.host === 'string' ? req.headers.host.split(':')[0] : '',
       ip: typeof req.headers?.['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0]?.trim() : '',
-      // Body - passar apenas se não for multipart
-      body: req.headers['content-type']?.includes('multipart/form-data') ? undefined : req.body
+      // Body - passar apenas se não for multipart (no Vercel já vem processado)
+      body: req.headers['content-type']?.includes('multipart/form-data') ? undefined : req.body,
+      // Remover propriedades que podem causar conflito com stream
+      readable: false,
+      readableEnded: true,
+      readableFlowing: false,
+      readableObjectMode: false
     }
     
     // Processar no Express
