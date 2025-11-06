@@ -10,10 +10,6 @@
   },
   "rewrites": [
     {
-      "source": "/api/upload-blob",
-      "destination": "/api/upload-blob"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "/api/[...]"
     },
