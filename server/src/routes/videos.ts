@@ -45,7 +45,13 @@ if (isVercel) {
 
 // Função auxiliar para salvar no Blob (opcional, não quebra se não estiver configurado)
 async function saveToBlob(fileName: string, buffer: Buffer, contentType: string): Promise<string | null> {
-  if (!isVercel || !process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isVercel) {
+    return null
+  }
+  
+  // Verificar se o token está configurado
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.warn('⚠️  BLOB_READ_WRITE_TOKEN não configurado')
     return null
   }
   
@@ -54,10 +60,12 @@ async function saveToBlob(fileName: string, buffer: Buffer, contentType: string)
     const blob = await put(fileName, buffer, {
       access: 'public',
       contentType: contentType,
+      token: process.env.BLOB_READ_WRITE_TOKEN
     })
+    console.log('✅ Vídeo salvo no Blob Storage:', blob.url)
     return blob.url
   } catch (error: any) {
-    console.warn('Blob Storage não disponível ou não configurado:', error.message)
+    console.error('❌ Erro ao salvar no Blob Storage:', error.message)
     return null
   }
 }
