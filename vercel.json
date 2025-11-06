@@ -1,10 +1,10 @@
 {
-  "buildCommand": "npm run build && cd server && npx prisma generate && cd ..",
+  "buildCommand": "npm run build && cd server && npm run build && npx prisma generate && cd ..",
   "outputDirectory": "dist",
   "installCommand": "npm install && cd server && npm install && cd ..",
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "server/src/**",
+      "includeFiles": "server/dist/**",
       "maxDuration": 30
     }
   },
@@ -12,6 +12,10 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/[...]"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

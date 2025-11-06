@@ -6,17 +6,7 @@ let app: any = null
 async function getApp() {
   if (!app) {
     try {
-      let serverModule: any
-      try {
-        serverModule = await import('../server/src/index.js')
-      } catch (error1: any) {
-        try {
-          // @ts-ignore
-          serverModule = await import('../server/dist/index.js')
-        } catch (error2: any) {
-          throw error1
-        }
-      }
+      const serverModule = await import('../server/dist/index.js')
       app = serverModule.default
       if (!app) {
         throw new Error('App Express não foi exportado corretamente')
@@ -33,11 +23,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const expressApp = await getApp()
     
-    // Construir path do query (catch-all do Vercel)
+    // Construir path - Vercel passa os segments no query como números
     let path = '/api'
     const segments: string[] = []
     
-    // Pegar segments do query (catch-all do Vercel usa query params numerados)
     if (req.query) {
       let i = 0
       while (req.query[String(i)] !== undefined) {
@@ -46,17 +35,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
-    // Se não tem segments no query, tentar pegar da URL
     if (segments.length > 0) {
       path = '/api/' + segments.join('/')
     } else if (req.url) {
-      // Remover query string se houver
       const urlPath = req.url.split('?')[0]
-      // Se já começa com /api, usar direto, senão adicionar
       if (urlPath.startsWith('/api')) {
         path = urlPath
-      } else {
-        path = '/api' + (urlPath.startsWith('/') ? urlPath : '/' + urlPath)
       }
     }
     
