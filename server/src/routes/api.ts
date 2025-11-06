@@ -443,10 +443,23 @@ router.patch('/submissions/:id/approve', async (req, res) => {
       data: { points: { increment: 1 } }
     })
 
-    // Deletar o arquivo físico do vídeo (apenas em desenvolvimento/local)
-    // No Vercel, os vídeos não são salvos fisicamente (apenas em memória durante upload)
+    // Deletar o arquivo de vídeo
     const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_URL
-    if (!isVercel) {
+    
+    if (isVercel && submission.videoUrl.startsWith('http')) {
+      // Deletar do Blob Storage (opcional, não quebra se não estiver configurado)
+      try {
+        if (process.env.BLOB_READ_WRITE_TOKEN) {
+          const { del } = await import('@vercel/blob')
+          await del(submission.videoUrl)
+          console.log('✅ Vídeo deletado do Blob Storage')
+        }
+      } catch (blobError: any) {
+        console.warn('Não foi possível deletar do Blob Storage:', blobError.message)
+        // Não falhar a aprovação
+      }
+    } else if (!isVercel) {
+      // Em desenvolvimento, deletar do disco
       const videoPath = path.join(__dirname, '..', '..', 'uploads', 'videos', submission.videoUrl)
       try {
         if (fs.existsSync(videoPath)) {
@@ -455,12 +468,8 @@ router.patch('/submissions/:id/approve', async (req, res) => {
         }
       } catch (fileError) {
         console.error('Erro ao deletar arquivo de vídeo:', fileError)
-        // Não falhar a aprovação se o arquivo não existir ou houver erro ao deletar
+        // Não falhar a aprovação
       }
-    } else {
-      // No Vercel, os vídeos não são salvos fisicamente (apenas em memória durante upload)
-      // Não há arquivo para deletar, apenas o registro do banco
-      console.log('⚠️  Vercel: vídeo não foi salvo fisicamente (apenas em memória durante upload)')
     }
 
     // Deletar o registro do banco de dados (remove o vídeo do sistema)
