@@ -418,7 +418,7 @@ router.post('/submissions', async (req: Request, res: Response) => {
       data: {
         userId,
         videoUrl,
-        status: 'PENDING'
+        status: 'pending'
       },
       include: {
         user: true
