@@ -47,11 +47,17 @@ const Upload = () => {
         // Usar API_URL para garantir que está usando a URL correta
         const uploadUrl = API_URL ? `${API_URL}/api/upload-blob` : '/api/upload-blob'
         
+        console.log('📡 Fazendo requisição para:', uploadUrl)
+        console.log('📦 Arquivo:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`)
+        console.log('📋 Content-Type:', file.type)
+        
         const blobResponse = await fetch(uploadUrl, {
           method: 'POST',
           body: formData,
-          // Não adicionar Content-Type - o browser define automaticamente
+          // Não adicionar Content-Type - o browser define automaticamente com boundary
         })
+        
+        console.log('📥 Resposta:', blobResponse.status, blobResponse.statusText)
         
         if (!blobResponse.ok) {
           const errorData = await blobResponse.json().catch(() => ({}))
