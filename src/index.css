@@ -327,6 +327,27 @@ main {
   width: 100%;
 }
 
+.app-footer {
+  padding: var(--space-4) var(--space-6);
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  border-top: 1px solid var(--gray-200);
+  background: white;
+}
+
+.app-footer a {
+  color: var(--secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.app-footer a:hover {
+  color: #0891b2;
+  text-decoration: underline;
+}
+
 .page-container {
   background: white;
   border-radius: var(--radius-xl);
@@ -1091,6 +1112,11 @@ table tr:last-child td {
     padding: var(--space-4) var(--space-4);
     max-width: 100%;
     margin: 0;
+  }
+
+  .app-footer {
+    padding: var(--space-4);
+    font-size: 0.8125rem;
   }
 
   .page-container h2 {

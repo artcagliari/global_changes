@@ -43,8 +43,3 @@ model RewardRedemption {
   pointsSpent Int
   redeemedAt DateTime @default(now())
 }
-
-
-
-
-

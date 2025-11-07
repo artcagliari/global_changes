@@ -100,6 +100,12 @@ const Layout = () => {
       <main>
         <Outlet />
       </main>
+      <footer className="app-footer">
+        Produzido por Artur Cagliari ·{' '}
+        <a href="https://portfolio-git-vert.vercel.app" target="_blank" rel="noopener noreferrer">
+          portfolio-git-vert.vercel.app
+        </a>
+      </footer>
     </div>
   )
 }
