@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/useAuthStore'
 
@@ -6,8 +6,17 @@ const LoginPage = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   const login = useAuthStore((state) => state.login)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,23 +44,22 @@ const LoginPage = () => {
 
   return (
     <div className="login-page" style={{
-      height: '100vh',
-      maxHeight: '100vh',
+      minHeight: '100vh',
       display: 'flex',
-      alignItems: 'center',
+      alignItems: isMobile ? 'flex-start' : 'center',
       justifyContent: 'center',
       background: 'linear-gradient(135deg, #10b981 0%, #059669 25%, #0ea5e9 50%, #0284c7 75%, #06b6d4 100%)',
       backgroundSize: '400% 400%',
       animation: 'gradientShift 15s ease infinite',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      overflow: 'hidden',
-      padding: '1rem',
+      position: 'relative',
+      padding: isMobile ? '1rem' : '1rem',
+      paddingTop: isMobile ? '2rem' : '1rem',
+      paddingBottom: isMobile ? '2rem' : '1rem',
       boxSizing: 'border-box',
-      margin: 0
+      margin: 0,
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      WebkitOverflowScrolling: 'touch'
     }}>
       {/* Efeitos de nuvens */}
       <div style={{
@@ -139,34 +147,40 @@ const LoginPage = () => {
 
       <div style={{
         display: 'flex',
-        gap: '2rem',
         width: '100%',
         maxWidth: '1200px',
         position: 'relative',
         zIndex: 1,
         flexWrap: 'wrap',
         justifyContent: 'center',
-        alignItems: 'center',
+        alignItems: isMobile ? 'stretch' : 'flex-start',
         margin: 'auto',
-        maxHeight: '100%',
-        overflowY: 'auto'
+        padding: isMobile ? '0' : '1rem 0',
+        paddingBottom: isMobile ? '3rem' : '1rem',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? '1.5rem' : '2rem',
+        minHeight: isMobile ? 'auto' : 'auto'
       }}>
         <form onSubmit={handleSubmit} className="login-form" style={{
           background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.98) 100%)',
           backdropFilter: 'blur(20px)',
-          padding: '3rem',
+          padding: isMobile ? '2rem 1.5rem 2.5rem' : '3rem',
           borderRadius: '24px',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3), 0 0 40px rgba(16, 185, 129, 0.2)',
-          flex: '0 1 450px',
-          minWidth: '350px',
+          flex: isMobile ? '0 0 auto' : '0 1 450px',
+          minWidth: isMobile ? '100%' : '350px',
+          maxWidth: isMobile ? '100%' : '450px',
+          width: isMobile ? '100%' : 'auto',
           position: 'relative',
           animation: 'slideInUp 0.6s ease-out',
-          border: '2px solid rgba(255, 255, 255, 0.5)'
+          border: '2px solid rgba(255, 255, 255, 0.5)',
+          order: isMobile ? 1 : 0,
+          marginBottom: isMobile ? '1rem' : '0'
         }}>
         <h2 style={{
           textAlign: 'center',
-          marginBottom: '2rem',
-          fontSize: '2.5rem',
+          marginBottom: isMobile ? '1.5rem' : '2rem',
+          fontSize: isMobile ? '2rem' : '2.5rem',
           background: 'linear-gradient(45deg, #10b981, #059669, #0ea5e9, #0284c7)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -302,8 +316,11 @@ const LoginPage = () => {
         <p className="register-link" style={{
           textAlign: 'center',
           color: '#64748b',
-          marginTop: '1.5rem',
-          marginBottom: 0
+          marginTop: isMobile ? '1rem' : '1.5rem',
+          marginBottom: isMobile ? '0.5rem' : 0,
+          paddingBottom: isMobile ? '0.5rem' : 0,
+          fontSize: isMobile ? '0.95rem' : '1rem',
+          lineHeight: '1.6'
         }}>
           Não tem uma conta?{' '}
           <a href="/register" style={{
@@ -311,7 +328,12 @@ const LoginPage = () => {
             textDecoration: 'none',
             fontWeight: '600',
             transition: 'all 0.3s ease',
-            borderBottom: '2px solid transparent'
+            borderBottom: '2px solid transparent',
+            display: 'inline-block',
+            padding: isMobile ? '0.5rem 0.25rem' : '0',
+            minHeight: isMobile ? '44px' : 'auto',
+            lineHeight: isMobile ? '1.5' : 'inherit',
+            touchAction: 'manipulation'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.color = '#0ea5e9'
@@ -329,15 +351,18 @@ const LoginPage = () => {
 
       {/* Seção explicativa sobre o aplicativo e ODS 13 - ao lado direito */}
       <div style={{
-        padding: '2.5rem',
+        padding: isMobile ? '1.5rem' : '2.5rem',
         background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 50%, #e0f2fe 100%)',
         backdropFilter: 'blur(20px)',
         borderRadius: '24px',
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3), 0 0 40px rgba(16, 185, 129, 0.2)',
-        flex: '0 1 500px',
-        minWidth: '350px',
+        flex: isMobile ? '1 1 100%' : '0 1 500px',
+        minWidth: isMobile ? '100%' : '350px',
+        maxWidth: isMobile ? '100%' : '500px',
         border: '2px solid rgba(16, 185, 129, 0.3)',
-        animation: 'slideInUp 0.8s ease-out'
+        animation: 'slideInUp 0.8s ease-out',
+        order: isMobile ? 2 : 0,
+        display: isMobile ? 'none' : 'block'
       }}>
         <h3 style={{
           marginTop: 0,
