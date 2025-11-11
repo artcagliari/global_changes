@@ -123,81 +123,6 @@ ecopontos-escolar/
 - `POST /api/videos/upload` - Upload de vídeo
 - `GET /uploads/videos/:filename` - Servir vídeo
 
-## 🚀 Como Executar
-
-### Desenvolvimento Local
-
-1. **Instalar dependências:**
-```bash
-npm install
-cd server && npm install
-```
-
-2. **Configurar banco de dados:**
-```bash
-cd server
-npx prisma generate
-npx prisma migrate dev
-```
-
-3. **Executar em desenvolvimento:**
-```bash
-npm run dev
-```
-Isso iniciará tanto o frontend (porta 5173) quanto o backend (porta 4000) simultaneamente.
-
-### Build para Produção
-
-```bash
-npm run build:prod
-```
-
-## 🌐 Deploy no Vercel
-
-### Pré-requisitos
-1. Conta no [Vercel](https://vercel.com)
-2. Repositório no GitHub
-3. Variáveis de ambiente configuradas no Vercel
-
-### Variáveis de Ambiente no Vercel
-
-Configure as seguintes variáveis no painel do Vercel:
-
-- `FRONTEND_URL` - URL do frontend (ex: `https://seu-projeto.vercel.app`)
-- `VITE_API_URL` - URL da API (ex: `https://seu-projeto.vercel.app/api`)
-- `NODE_ENV` - `production`
-- `DATABASE_URL` - URL do banco de dados (para produção, considere PostgreSQL)
-
-### Passos para Deploy
-
-1. **Conecte o repositório ao Vercel:**
-   - Acesse o dashboard do Vercel
-   - Clique em "New Project"
-   - Importe seu repositório do GitHub
-
-2. **Configure o build:**
-   - O arquivo `vercel.json` já está configurado
-   - Build Command: `npm run build && cd server && npm run prisma:generate && npm run build`
-   - Output Directory: `dist`
-
-3. **Configure as variáveis de ambiente:**
-   - Adicione todas as variáveis listadas acima
-   - Certifique-se de usar URLs de produção
-
-4. **Deploy:**
-   - Clique em "Deploy"
-   - Aguarde o build concluir
-
-### ⚠️ Nota Importante sobre Banco de Dados
-
-O projeto atual usa SQLite, que **não é recomendado para produção no Vercel** porque:
-- O sistema de arquivos do Vercel é read-only em produção
-- Dados podem ser perdidos entre deploys
-
-**Recomendações para produção:**
-- Use PostgreSQL com Prisma (ex: Vercel Postgres, Supabase, Railway)
-- Atualize o `schema.prisma` para usar `provider = "postgresql"`
-- Configure a variável `DATABASE_URL` no Vercel
 
 ## 📝 Funcionalidades
 
@@ -232,7 +157,7 @@ Tudo isso alinhado com os **Objetivos de Desenvolvimento Sustentável (ODS)**, e
 - React + TypeScript
 - Express.js + Prisma
 - Vite + Vercel
-- Muito amor pelo meio ambiente 🌱
+
 
 ## 📄 Licença
 
